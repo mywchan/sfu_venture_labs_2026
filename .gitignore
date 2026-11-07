@@ -1,0 +1,17 @@
+# piezas
+.env
+.env.*
+
+# dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+
+# test output
+test-results/
+playwright-report/
+.piezas/test-results/
+
+# Office lock files
+~$*
