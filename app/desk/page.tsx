@@ -105,7 +105,9 @@ function ChildPanel({ child }: { child: Child }) {
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
   const [jacket, setJacket] = useState(a?.jacket ?? '');
+  const [pants, setPants] = useState(a?.pants ?? '');
   const [helmet, setHelmet] = useState(a?.helmet ?? '');
+  const clothingDone = Boolean(jacket.trim() && pants.trim() && helmet.trim());
   const [otherName, setOtherName] = useState('');
   const [askOther, setAskOther] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
@@ -123,8 +125,8 @@ function ChildPanel({ child }: { child: Child }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!jacket.trim() || !helmet.trim()) return;
-            checkIn(child.id, jacket.trim(), helmet.trim());
+            if (!clothingDone) return;
+            checkIn(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
           }}
           data-testid="checkin-form"
         >
@@ -136,17 +138,21 @@ function ChildPanel({ child }: { child: Child }) {
               <input id="jacket" value={jacket} onChange={(e) => setJacket(e.target.value)} data-testid="checkin-jacket" />
             </div>
             <div className="field">
+              <label htmlFor="pants">Pants colour</label>
+              <input id="pants" value={pants} onChange={(e) => setPants(e.target.value)} data-testid="checkin-pants" />
+            </div>
+            <div className="field">
               <label htmlFor="helmet">Helmet colour</label>
               <input id="helmet" value={helmet} onChange={(e) => setHelmet(e.target.value)} data-testid="checkin-helmet" />
             </div>
           </div>
-          <button className="primary big" type="submit" disabled={!jacket.trim() || !helmet.trim()} data-testid="checkin-submit">Check in {child.firstName}</button>
+          <button className="primary big" type="submit" disabled={!clothingDone} data-testid="checkin-submit">Check in {child.firstName}</button>
         </form>
       )}
 
       {a?.checkInAt && (
         <div className="banner ok" data-testid="checkin-status">
-          Checked in at {timeLabel(a.checkInAt)} by {userName(data, a.checkedInBy)} · {a.jacket} jacket, {a.helmet} helmet
+          Checked in at {timeLabel(a.checkInAt)} by {userName(data, a.checkedInBy)} · {a.jacket} jacket, {a.pants} pants, {a.helmet} helmet
         </div>
       )}
 

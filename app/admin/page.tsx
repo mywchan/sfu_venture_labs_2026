@@ -170,7 +170,7 @@ function ChildrenTab() {
       <h2>All children ({data.children.length})</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Child</th><th>Age</th><th>Level</th><th>Day</th><th>Order</th><th>Today</th><th /></tr></thead>
+          <thead><tr><th>Child</th><th>Age</th><th>Level</th><th>Day</th><th>Order</th><th>Today</th><th>Check-in details</th><th /></tr></thead>
           <tbody>
             {data.children.map((c) => {
               const a = todaysAttendance(data, c.id);
@@ -183,6 +183,17 @@ function ChildrenTab() {
                   <td>{c.programDay}</td>
                   <td className="small">{c.orderNumber}</td>
                   <td>{search ? <span className="chip danger">Missing</span> : a?.pickupAt ? 'Gone home' : a?.checkInAt ? 'Here' : '—'}</td>
+                  <td className="small" data-testid={`child-checkin-${c.id}`}>
+                    {a?.checkInAt ? (
+                      <>
+                        {timeLabel(a.checkInAt)} by {userName(data, a.checkedInBy)}
+                        <br />
+                        Jacket {a.jacket} · Pants {a.pants} · Helmet {a.helmet}
+                      </>
+                    ) : (
+                      <span className="muted">Not checked in</span>
+                    )}
+                  </td>
                   <td className="row" style={{ gap: 6 }}>
                     <button type="button" onClick={() => setEditing(c)} data-testid={`edit-${c.id}`}>Edit</button>
                     {a?.checkInAt && !a.pickupAt && !search && (

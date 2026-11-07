@@ -42,7 +42,7 @@ type Store = {
   // instructor
   logAccess: (what: string, childId: string) => void;
   // desk
-  checkIn: (childId: string, jacket: string, helmet: string) => void;
+  checkIn: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
   release: (childId: string, personId: string) => void;
   refusePickup: (childId: string, nameGiven: string) => void;
   // missing child
@@ -149,7 +149,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
-      checkIn: (childId, jacket, helmet) =>
+      checkIn: (childId, { jacket, pants, helmet }) =>
         update((d) => {
           const existing = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);
           const row: Attendance = {
@@ -159,6 +159,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             checkInAt: stamp(),
             checkedInBy: userId,
             jacket,
+            pants,
             helmet,
             pickupAt: null,
             pickedUpBy: null,
@@ -192,6 +193,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 lastSeenPlace,
                 lastSeenAt: `${TODAY}T${lastSeenTime}:00`,
                 jacket: att?.jacket ?? 'Not recorded',
+                pants: att?.pants ?? 'Not recorded',
                 helmet: att?.helmet ?? 'Not recorded',
                 status: 'open',
                 sharedWithPoliceAt: null,

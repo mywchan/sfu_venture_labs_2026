@@ -121,6 +121,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             </div>
             <dl className="kv" style={{ flex: 1 }}>
               <dt>Jacket</dt><dd data-testid="search-jacket">{em.jacket}</dd>
+              <dt>Pants</dt><dd data-testid="search-pants">{em.pants}</dd>
               <dt>Helmet</dt><dd data-testid="search-helmet">{em.helmet}</dd>
               <dt>Level</dt><dd>{child.level}</dd>
               <dt>Bib</dt><dd>{child.bib}</dd>

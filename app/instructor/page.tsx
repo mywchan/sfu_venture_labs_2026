@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { OfflineCopyCard, OfflineCopyView, useOfflineCopy, useOnline } from '@/components/OfflineCopy';
 import { ReportMissing } from '@/components/ReportMissing';
 import { Shell } from '@/components/Shell';
 import { ageOn, fullName, groupForInstructor, openSearchFor, todaysAttendance } from '@/lib/access';
@@ -20,6 +21,14 @@ function MyGroup() {
   const { group, kids } = groupForInstructor(data, me!);
   const [detail, setDetail] = useState<{ child: Child; alert: MedicalAlert } | null>(null);
   const [missing, setMissing] = useState<Child | null>(null);
+  const { copy, save, remove } = useOfflineCopy(me!);
+  const online = useOnline();
+  const [viewingCopy, setViewingCopy] = useState(false);
+
+  // With no connection, the saved copy is all there is.
+  if (copy && (!online || viewingCopy)) {
+    return <OfflineCopyView copy={copy} online={online} onBack={() => setViewingCopy(false)} />;
+  }
 
   if (!group) {
     return (
@@ -34,6 +43,7 @@ function MyGroup() {
     <>
       <h1 data-testid="group-title">{group.name} · Level {group.level}</h1>
       <p className="muted">{kids.length} children today. Tap an alert for details.</p>
+      <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} />
       <div data-testid="group-list">
         {kids.map((c) => {
           const alerts = data.medical.filter((m) => m.childId === c.id);
@@ -46,7 +56,7 @@ function MyGroup() {
                   <div className="name">{fullName(c)}</div>
                   <div className="small muted">
                     Age {ageOn(c.birthDate, TODAY)} · Bib {c.bib}
-                    {att?.checkInAt ? ` · ${att.jacket} jacket, ${att.helmet} helmet` : ''}
+                    {att?.checkInAt ? ` · ${att.jacket} jacket, ${att.pants} pants, ${att.helmet} helmet` : ''}
                   </div>
                 </div>
                 {search ? (

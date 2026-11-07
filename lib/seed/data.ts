@@ -57,6 +57,7 @@ export type Attendance = {
   checkInAt: string | null;
   checkedInBy: string | null;
   jacket: string;
+  pants: string;
   helmet: string;
   pickupAt: string | null;
   pickedUpBy: string | null; // person id
@@ -79,6 +80,7 @@ export type Emergency = {
   lastSeenPlace: string;
   lastSeenAt: string;
   jacket: string;
+  pants: string;
   helmet: string;
   status: 'open' | 'closed';
   sharedWithPoliceAt: string | null;
@@ -299,27 +301,28 @@ export const groupMembers: GroupMember[] = [
 ];
 
 // Most children are already checked in this morning; a few are still to come.
-const checkedIn: [string, string, string, string][] = [
-  ['c-ava', '08:34', 'Purple', 'White'],
-  ['c-noah', '08:36', 'Green', 'Black'],
-  ['c-chloe', '08:41', 'Yellow', 'Pink'],
-  ['c-ethan', '08:44', 'Blue', 'Black'],
-  ['c-lily', '08:38', 'Pink', 'Pink'],
-  ['c-mateo', '08:47', 'Orange', 'Blue'],
-  ['c-zoe', '08:52', 'Teal', 'White'],
-  ['c-liam', '08:55', 'Black', 'Red'],
-  ['c-maya', '08:31', 'White', 'Grey'],
-  ['c-lucas', '08:40', 'Navy', 'Black'],
-  ['c-aria', '08:58', 'Red', 'White'],
+const checkedIn: [child: string, time: string, jacket: string, pants: string, helmet: string][] = [
+  ['c-ava', '08:34', 'Purple', 'Black', 'White'],
+  ['c-noah', '08:36', 'Green', 'Grey', 'Black'],
+  ['c-chloe', '08:41', 'Yellow', 'Navy', 'Pink'],
+  ['c-ethan', '08:44', 'Blue', 'Black', 'Black'],
+  ['c-lily', '08:38', 'Pink', 'Purple', 'Pink'],
+  ['c-mateo', '08:47', 'Orange', 'Black', 'Blue'],
+  ['c-zoe', '08:52', 'Teal', 'White', 'White'],
+  ['c-liam', '08:55', 'Black', 'Red', 'Red'],
+  ['c-maya', '08:31', 'White', 'Black', 'Grey'],
+  ['c-lucas', '08:40', 'Navy', 'Grey', 'Black'],
+  ['c-aria', '08:58', 'Red', 'Black', 'White'],
 ];
 
-export const attendance: Attendance[] = checkedIn.map(([childId, time, jacket, helmet]) => ({
+export const attendance: Attendance[] = checkedIn.map(([childId, time, jacket, pants, helmet]) => ({
   id: `a-${childId}`,
   childId,
   lessonDayId: TODAY_LESSON_DAY,
   checkInAt: at(time),
   checkedInBy: 'u-mei',
   jacket,
+  pants,
   helmet,
   pickupAt: null,
   pickedUpBy: null,
