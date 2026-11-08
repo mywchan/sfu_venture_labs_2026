@@ -33,8 +33,8 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 |---|---|---|---|---|
 | 2.1 | Your children | `/parent` | Built | One card per child: name, age, level, day, group. A "1 to finish" chip with the list of what's missing (R-004, R-027). |
 | 2.2 | Child: Lessons | `/parent/[childId]` (tab) | Built | Today's group and instructor, check-in time, pickup time and who picked them up, the season's lesson dates (R-010). |
-| 2.3 | Child: Contacts & pickup | same, tab | Built | List of adults: relationship, phone, email, "Emergency contact 1/2" chip, "Can pick up" chip. Edit and Remove on each (R-005). |
-| 2.4 | Add or edit an adult | same, form | Built | Name, relationship, phone (checked: must be 10 digits, R-009), email (optional), emergency contact (none, 1st or 2nd), "Allowed to pick up" checkbox. Choosing 1st or 2nd moves that label off whoever had it. |
+| 2.3 | Child: Contacts & pickup | same, tab | Built | List of adults: relationship, phone, email, "Emergency contact 1/2/3…" chip, "Can pick up" chip. Edit and Remove on each (R-005). |
+| 2.4 | Add or edit an adult | same, form | Built | Name, relationship, phone (checked: must be 10 digits, R-009), email (optional), emergency contact (none, or a position: the list always offers one more than there are contacts, so 3rd appears once there are 2, 4th once there are 3), "Allowed to pick up" checkbox. Choosing a position someone holds moves them and everyone after them down one. Removing a contact closes the gap. |
 | 2.5 | Child: Medical | same, tab | Built | Each alert shows the short alert line coloured by severity, the details and the medication location. A "no allergies or conditions" checkbox when there are none (R-006). |
 | 2.6 | Add or edit an alert | same, form | Built | Short alert (one line for the instructor), details, where medication is kept, how serious (life-threatening, needs attention, good to know). |
 | 2.7 | Child: Consent form | same, tab | Built | Consent text, optional photo consent, "I agree", type full name to sign. After signing: a read-only summary (R-008). |

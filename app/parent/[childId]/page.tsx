@@ -10,6 +10,7 @@ import {
   formatPhone,
   fullName,
   groupOfChild,
+  ordinal,
   parentOwnsChild,
   phoneProblem,
   timeLabel,
@@ -134,7 +135,10 @@ function AdultsTab({ childId }: { childId: string }) {
 let personN = 0;
 
 function AdultForm({ childId, initial, onDone }: { childId: string; initial: { link?: ChildPerson; person?: Person }; onDone: () => void }) {
-  const { savePerson } = useStore();
+  const { data, savePerson } = useStore();
+  // One more position than there are other emergency contacts: with 2 already, a 3rd is offered, and so on.
+  const otherContacts = adultsFor(data, childId).filter((x) => x.link.contactOrder !== null && x.link.id !== initial.link?.id).length;
+  const positions = Array.from({ length: otherContacts + 1 }, (_, i) => i + 1);
   const [name, setName] = useState(initial.person?.name ?? '');
   const [relationship, setRelationship] = useState(initial.link?.relationship ?? '');
   const [phone, setPhone] = useState(initial.person?.phone ?? '');
@@ -159,7 +163,7 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
         savePerson(
           childId,
           { id: initial.person?.id ?? `p-new-${++personN}`, name: name.trim(), phone: formatPhone(phone), email: email.trim() },
-          { relationship: relationship.trim(), contactOrder: order ? (Number(order) as 1 | 2) : null, canPickUp },
+          { relationship: relationship.trim(), contactOrder: order ? Number(order) : null, canPickUp },
           initial.link?.id,
         );
         onDone();
@@ -190,8 +194,9 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
           <label htmlFor="a-order">Emergency contact</label>
           <select id="a-order" value={order} onChange={(e) => setOrder(e.target.value)} data-testid="adult-order">
             <option value="">Not an emergency contact</option>
-            <option value="1">1st emergency contact</option>
-            <option value="2">2nd emergency contact</option>
+            {positions.map((n) => (
+              <option key={n} value={n}>{ordinal(n)} emergency contact</option>
+            ))}
           </select>
         </div>
         <div className="field" style={{ alignSelf: 'end' }}>

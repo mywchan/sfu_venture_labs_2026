@@ -25,7 +25,7 @@ export type ChildPerson = {
   childId: string;
   personId: string;
   relationship: string;
-  contactOrder: 1 | 2 | null;
+  contactOrder: number | null; // 1 is called first; no upper limit
   canPickUp: boolean;
 };
 
@@ -201,7 +201,7 @@ export const persons: Person[] = [
 ];
 
 let cpN = 0;
-const link = (childId: string, personId: string, relationship: string, contactOrder: 1 | 2 | null, canPickUp: boolean): ChildPerson => ({
+const link = (childId: string, personId: string, relationship: string, contactOrder: number | null, canPickUp: boolean): ChildPerson => ({
   id: `cp-${++cpN}`,
   childId,
   personId,
