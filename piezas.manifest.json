@@ -2,7 +2,7 @@
   "$schema": "https://piezas.ai/schemas/piezas-manifest.schema.json",
   "schemaVersion": 1,
   "generatedBy": "piezas",
-  "appName": "sfu_venture_labs_2026",
+  "appName": "Peak Pals by Kestrel Kids",
   "apiBaseUrl": "https://api.piezas.ai",
   "contractVersion": "15",
   "contractFetchedAt": "2026-11-07T03:36:38.544Z",
@@ -125,7 +125,7 @@
     "Run `npx piezas doctor` after AI-generated changes."
   ],
   "testApp": {
-    "appId": "73ebd87d-bc6e-483f-ab31-99946838fb07",
+    "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc",
     "appName": "sfu_venture_labs_2026 (test)"
   }
 }
