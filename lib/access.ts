@@ -2,7 +2,7 @@
 // In the preview these run in the browser. In the real build the same checks
 // run on the server before any record leaves Piezas.
 
-import { TODAY_LESSON_DAY, type Child, type Data, type Emergency, type User } from './seed/data';
+import { TODAY, TODAY_LESSON_DAY, type Child, type Data, type Emergency, type User } from './seed/data';
 
 export const fullName = (c: Pick<Child, 'firstName' | 'lastName'>) => `${c.firstName} ${c.lastName}`;
 
@@ -95,6 +95,17 @@ export function timeLabel(iso: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** A Date as 24-hour "HH:MM", the format a time input uses. */
+export function hhmm(d: Date) {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** This device's real time of day, placed on the preview's pretend date. */
+export function systemTimeOnPreviewDay() {
+  const d = new Date();
+  return new Date(`${TODAY}T${hhmm(d)}:${String(d.getSeconds()).padStart(2, '0')}`);
 }
 
 /** Police must be called 60 minutes after last seen, or at 4 p.m., whichever comes first. */

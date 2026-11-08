@@ -81,6 +81,7 @@ export type Emergency = {
   reportedBy: string;
   lastSeenPlace: string;
   lastSeenAt: string;
+  usesSystemClock?: boolean; // preview only: last seen was picked against the real clock, not the demo clock
   jacket: string;
   pants: string;
   helmet: string;

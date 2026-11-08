@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Shell } from '@/components/Shell';
-import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, timeLabel, userName } from '@/lib/access';
+import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, systemTimeOnPreviewDay, timeLabel, userName } from '@/lib/access';
 import { TODAY, type Emergency } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
 
@@ -99,9 +99,11 @@ function SearchScreen({ em }: { em: Emergency }) {
   }, [logAccess, child.id]);
 
   const deadline = policeDeadline(em.lastSeenAt);
-  const msLeft = deadline.getTime() - now.getTime();
+  // A report made against the real clock has to be counted against the real clock.
+  const clock = em.usesSystemClock ? systemTimeOnPreviewDay() : now;
+  const msLeft = deadline.getTime() - clock.getTime();
   const minsLeft = Math.ceil(msLeft / 60_000);
-  const minsMissing = Math.max(0, Math.floor((now.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
+  const minsMissing = Math.max(0, Math.floor((clock.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
 
   return (
     <div data-testid="search-screen">
