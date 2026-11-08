@@ -213,7 +213,7 @@ function ChildrenTab() {
         </table>
       </div>
       {editing && <EditChild child={editing} onClose={() => setEditing(null)} />}
-      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} />}
+      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} limitToSystemTime />}
     </section>
   );
 }

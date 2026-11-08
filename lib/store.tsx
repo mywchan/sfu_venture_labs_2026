@@ -48,7 +48,7 @@ type Store = {
   release: (childId: string, personId: string) => void;
   refusePickup: (childId: string, nameGiven: string) => void;
   // missing child
-  reportMissing: (childId: string, lastSeenPlace: string, lastSeenTime: string) => string;
+  reportMissing: (childId: string, lastSeenPlace: string, lastSeenTime: string, usesSystemClock?: boolean) => string;
   acknowledge: (emergencyId: string) => void;
   shareWithPolice: (emergencyId: string) => void;
   markNoticeMailed: (emergencyId: string) => void;
@@ -210,7 +210,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           refusals: [{ id: newId('rf'), childId, lessonDayId: TODAY_LESSON_DAY, nameGiven, at: stamp(), staffId: userId }, ...d.refusals],
         })),
-      reportMissing: (childId, lastSeenPlace, lastSeenTime) => {
+      reportMissing: (childId, lastSeenPlace, lastSeenTime, usesSystemClock = false) => {
         const id = newId('em');
         update((d) => {
           const att = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);
@@ -223,6 +223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 reportedBy: userId,
                 lastSeenPlace,
                 lastSeenAt: `${TODAY}T${lastSeenTime}:00`,
+                usesSystemClock,
                 jacket: att?.jacket ?? 'Not recorded',
                 pants: att?.pants ?? 'Not recorded',
                 helmet: att?.helmet ?? 'Not recorded',
