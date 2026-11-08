@@ -51,13 +51,14 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 | 3.4 | Save for offline | `/instructor` (card) | Built | "Save for offline" button. Once saved: the time it was saved, "Update saved copy", "View offline copy", "Delete" (R-032). |
 | 3.5 | Offline copy | `/instructor` (no connection) | Partly built | Read-only group list with a warning: "No connection. Showing your offline copy (saved 1:35 p.m.)." Real build: the page must also load from scratch with no wifi (offline web app), not just while it's already open. |
 | 3.6 | No group today | `/instructor` | Built | "You aren't teaching a group today." |
+| 3.7 | Fix clothing | `/instructor` (sheet) | Built | "Fix clothing" on each checked-in child in the instructor's own group. Same colour buttons and text box as check-in. Saves who corrected it and when, and updates patrol's screen if a search is open (R-034). Needs a connection. |
 
 ## 4. Desk / receptionist (laptop or tablet at the counter)
 
 | # | Screen | Address | Status | What it does |
 |---|---|---|---|---|
 | 4.1 | Check-in and pickup | `/desk` | Built | Counts at top ("11 of 16 checked in", "0 gone home"). Search by name or bib on the left, child panel on the right. **Never shows medical information** (R-015, R-018). |
-| 4.2 | Check in | `/desk` (panel) | Built | Jacket, pants and helmet colour (all required), then "Check in". Afterwards: "Checked in at 8:38 a.m. by Mei Tanaka · Pink jacket, Purple pants, Pink helmet." |
+| 4.2 | Check in | `/desk` (panel) | Built | Jacket, pants and helmet colour (all required): tap one of 12 colour buttons or type in the box (`components/ColourPicker.tsx`), then "Check in". Afterwards: "Checked in at 8:38 a.m. by Mei Tanaka · Pink jacket, Purple pants, Pink helmet." |
 | 4.3 | Pickup | `/desk` (panel) | Built | One big "Release to <name> (<relationship>)" button per approved adult, with phone. "Ask for photo ID" hint. Afterwards: who took them and who released them (R-016). |
 | 4.4 | Someone else is here | `/desk` (panel) | Built | "Name the adult gave", then "Check". Shows a red warning ("…is NOT on Lily's pickup list. Do not release…") and records the attempt (R-017). |
 | 4.5 | Pickups refused today | `/desk` (bottom) | Built | Table: time, child, adult who asked, staff member. |
@@ -97,7 +98,7 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 
 ## Summary
 
-- **47 screens and parts of screens.** 32 are built, 5 are partly built, and 10 are not built.
+- **48 screens and parts of screens.** 33 are built, 5 are partly built, and 10 are not built.
 - **Most important new screens:**
   - staff accounts (6.6): no one can create an instructor without it;
   - welcome / set password (1.3): parents can't get in without it;

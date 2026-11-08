@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { OfflineCopyCard, OfflineCopyView, useOfflineCopy, useOnline } from '@/components/OfflineCopy';
+import { ColourPicker } from '@/components/ColourPicker';
 import { ReportMissing } from '@/components/ReportMissing';
 import { Shell } from '@/components/Shell';
-import { ageOn, fullName, groupForInstructor, openSearchFor, todaysAttendance } from '@/lib/access';
+import { ageOn, fullName, groupForInstructor, openSearchFor, timeLabel, todaysAttendance, userName } from '@/lib/access';
 import { TODAY, type Child, type MedicalAlert } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
 
@@ -21,6 +22,7 @@ function MyGroup() {
   const { group, kids } = groupForInstructor(data, me!);
   const [detail, setDetail] = useState<{ child: Child; alert: MedicalAlert } | null>(null);
   const [missing, setMissing] = useState<Child | null>(null);
+  const [fixing, setFixing] = useState<Child | null>(null);
   const { copy, save, remove } = useOfflineCopy(me!);
   const online = useOnline();
   const [viewingCopy, setViewingCopy] = useState(false);
@@ -74,10 +76,20 @@ function MyGroup() {
                   ⚠ {a.shortAlert}
                 </button>
               ))}
-              {att?.checkInAt && !att.pickupAt && !search && (
-                <button type="button" className="ghost small" style={{ alignSelf: 'flex-start', color: 'var(--danger)' }} onClick={() => setMissing(c)} data-testid={`report-missing-${c.id}`}>
-                  Report missing
-                </button>
+              {att?.clothingFixedAt && (
+                <div className="small muted" data-testid={`clothing-fixed-${c.id}`}>Clothing corrected at {timeLabel(att.clothingFixedAt)} by {userName(data, att.clothingFixedBy ?? null)}</div>
+              )}
+              {att?.checkInAt && !att.pickupAt && (
+                <div className="row">
+                  <button type="button" className="ghost small" onClick={() => setFixing(c)} data-testid={`fix-clothing-${c.id}`}>
+                    Fix clothing
+                  </button>
+                  {!search && (
+                    <button type="button" className="ghost small" style={{ color: 'var(--danger)' }} onClick={() => setMissing(c)} data-testid={`report-missing-${c.id}`}>
+                      Report missing
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -85,7 +97,41 @@ function MyGroup() {
       </div>
       {detail && <MedicalDetail child={detail.child} alert={detail.alert} onClose={() => setDetail(null)} />}
       {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} />}
+      {fixing && <FixClothing child={fixing} onClose={() => setFixing(null)} />}
     </>
+  );
+}
+
+function FixClothing({ child, onClose }: { child: Child; onClose: () => void }) {
+  const { data, fixClothing } = useStore();
+  const att = todaysAttendance(data, child.id);
+  const [jacket, setJacket] = useState(att?.jacket ?? '');
+  const [pants, setPants] = useState(att?.pants ?? '');
+  const [helmet, setHelmet] = useState(att?.helmet ?? '');
+  const complete = Boolean(jacket.trim() && pants.trim() && helmet.trim());
+
+  return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="fix-title" onClick={onClose}>
+      <form
+        className="sheet"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!complete) return;
+          fixClothing(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
+          onClose();
+        }}
+        data-testid="fix-clothing-sheet"
+      >
+        <h2 id="fix-title">What is {child.firstName} wearing now?</h2>
+        <p className="small muted">Ski patrol uses this if {child.firstName} goes missing. Your name is recorded with the change.</p>
+        <ColourPicker id="fix-jacket" label="Jacket colour" value={jacket} onChange={setJacket} testId="fix-jacket" />
+        <ColourPicker id="fix-pants" label="Pants colour" value={pants} onChange={setPants} testId="fix-pants" />
+        <ColourPicker id="fix-helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="fix-helmet" />
+        <button className="big primary" type="submit" disabled={!complete} data-testid="fix-clothing-save">Save</button>
+        <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
+      </form>
+    </div>
   );
 }
 

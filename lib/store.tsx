@@ -5,6 +5,7 @@
 // call to Piezas made from the server, after checking the signed-in person's role.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { groupForInstructor } from './access';
 import {
   seedData,
   TODAY,
@@ -41,6 +42,7 @@ type Store = {
   signConsent: (form: ConsentForm) => void;
   // instructor
   logAccess: (what: string, childId: string) => void;
+  fixClothing: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
   // desk
   checkIn: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
   release: (childId: string, personId: string) => void;
@@ -165,6 +167,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
+      fixClothing: (childId, clothing) =>
+        update((d) => {
+          // Instructors may only correct children in their own group today.
+          if (role === 'instructor' && me && !groupForInstructor(d, me).kids.some((c) => c.id === childId)) return d;
+          return {
+            ...d,
+            attendance: d.attendance.map((a) =>
+              a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY ? { ...a, ...clothing, clothingFixedBy: userId, clothingFixedAt: stamp() } : a,
+            ),
+            // A correction during a search has to reach patrol too.
+            emergencies: d.emergencies.map((e) => (e.childId === childId && e.status === 'open' ? { ...e, ...clothing } : e)),
+          };
+        }),
       checkIn: (childId, { jacket, pants, helmet }) =>
         update((d) => {
           const existing = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);

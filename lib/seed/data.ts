@@ -59,6 +59,8 @@ export type Attendance = {
   jacket: string;
   pants: string;
   helmet: string;
+  clothingFixedBy?: string | null; // user id of whoever last corrected the clothing
+  clothingFixedAt?: string | null;
   pickupAt: string | null;
   pickedUpBy: string | null; // person id
   releasedBy: string | null; // user id
