@@ -102,6 +102,26 @@ export function hhmm(d: Date) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+const CHECK_IN_STARTS = 8 * 60 + 30; // 8:30 a.m., in minutes after midnight
+const LAST_SEEN_STEP = 5; // minutes between choices in the list
+
+/**
+ * The times an instructor may pick for "last seen": now first, then every
+ * 5 minutes back to 8:30 a.m. Empty before check-in has started.
+ */
+export function lastSeenTimeChoices(current: Date) {
+  const nowMinutes = current.getHours() * 60 + current.getMinutes();
+  if (nowMinutes < CHECK_IN_STARTS) return [];
+  const toChoice = (minutes: number, suffix = '') => {
+    const d = new Date(2000, 0, 1, Math.floor(minutes / 60), minutes % 60);
+    return { value: hhmm(d), label: d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) + suffix };
+  };
+  const choices = [toChoice(nowMinutes, ' (now)')];
+  const firstStep = Math.floor((nowMinutes - 1) / LAST_SEEN_STEP) * LAST_SEEN_STEP;
+  for (let m = firstStep; m >= CHECK_IN_STARTS; m -= LAST_SEEN_STEP) choices.push(toChoice(m));
+  return choices;
+}
+
 /** This device's real time of day, placed on the preview's pretend date. */
 export function systemTimeOnPreviewDay() {
   const d = new Date();
