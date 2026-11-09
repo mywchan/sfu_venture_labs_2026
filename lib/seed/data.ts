@@ -139,6 +139,7 @@ export const users: User[] = [
   { id: 'u-sam', name: 'Sam Lee', email: 'sam.lee@example.test', role: 'instructor' },
   { id: 'u-priya', name: 'Priya Natt', email: 'priya.natt@example.test', role: 'instructor' },
   { id: 'u-jordan', name: 'Jordan Blake', email: 'jordan.blake@example.test', role: 'instructor' },
+  { id: 'u-alex', name: 'Alex Rivera', email: 'alex.rivera@example.test', role: 'instructor' },
   { id: 'u-mei', name: 'Mei Tanaka', email: 'mei.tanaka@example.test', role: 'desk' },
   { id: 'u-rob', name: 'Rob Fournier', email: 'rob.fournier@example.test', role: 'patrol' },
   { id: 'u-kai', name: 'Kai Andersen', email: 'kai.andersen@example.test', role: 'patrol' },

@@ -122,6 +122,7 @@ const demoHint: Record<string, string> = {
   'u-sam': 'Group A · level 3',
   'u-priya': 'Group B · level 1',
   'u-jordan': 'Group C · level 5',
+  'u-alex': 'No group yet',
   'u-mei': 'Check-in and pickup',
   'u-rob': 'Patrol director',
   'u-kai': 'Patroller',

@@ -16,6 +16,8 @@ import {
   type ConsentForm,
   type Data,
   type Emergency,
+  type Group,
+  type GroupMember,
   type MedicalAlert,
   type PatrolAck,
   type Person,
@@ -64,8 +66,8 @@ type Store = {
   closeSearch: (emergencyId: string, outcome: string) => Promise<void>;
   // admin
   updateChild: (childId: string, patch: Partial<Data['children'][number]>) => void;
-  addGroup: (name: string, level: number, instructorId: string) => void;
-  moveChild: (childId: string, groupId: string | null) => void;
+  addGroup: (name: string, level: number, instructorId: string) => Promise<void>;
+  moveChild: (childId: string, groupId: string | null) => Promise<void>;
   importRows: (rows: ImportRow[]) => { added: number; updated: number };
 };
 
@@ -114,6 +116,9 @@ function applyGuardians(d: Data, rows: GuardianRow[], childIds: Set<string>): Da
     ],
   };
 }
+
+// Today's groups, saved ones included (see lib/server/roster.ts).
+type RosterRows = { groups: Group[]; groupMembers: GroupMember[] };
 
 // What the server sends back for today (see lib/server/today.ts).
 type TodayRows = { attendance: Attendance[]; refusals: PickupRefusal[]; emergencies: Emergency[]; acks: PatrolAck[] };
@@ -235,6 +240,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearInterval(t);
     };
   }, [meId, staff]);
+
+  // Groups come from Peak Pals too, so an assignment reaches the instructor.
+  useEffect(() => {
+    if (!meId) return;
+    let stopped = false;
+    const load = async () => {
+      const startedAt = saves.current;
+      try {
+        const res = await fetch(`/api/groups?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const roster = (await res.json()) as RosterRows;
+        if (!stopped && saves.current === startedAt) setData((d) => ({ ...d, ...roster }));
+      } catch {
+        /* the "can't reach Peak Pals" banner already covers this */
+      }
+    };
+    void load();
+    const t = setInterval(load, staff ? 5_000 : 30_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId, staff]);
+
+  /** Saves a group change. The screen only changes once it's saved. */
+  const sendGroups = useCallback(async (asUserId: string, action: Record<string, unknown>) => {
+    saves.current += 1;
+    try {
+      const res = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ as: asUserId, ...action }) });
+      const body = (await res.json().catch(() => ({}))) as Partial<RosterRows> & { error?: string };
+      if (!res.ok || !body.groups || !body.groupMembers) throw new Error(body.error ?? 'That didn’t save. Please try again.');
+      const roster = { groups: body.groups, groupMembers: body.groupMembers };
+      setData((d) => ({ ...d, ...roster }));
+    } finally {
+      saves.current += 1;
+    }
+  }, []);
 
   // Notifications come from Peak Pals on the same 5-second beat as today's records.
   useEffect(() => {
@@ -389,14 +431,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       closeSearch: (emergencyId, outcome) => sendToday(userId, { action: 'closeSearch', emergencyId, outcome, at: stamp() }),
       updateChild: (childId, patch) =>
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)) })),
-      addGroup: (name, level, instructorId) =>
-        update((d) => ({ ...d, groups: [...d.groups, { id: newId('g'), lessonDayId: TODAY_LESSON_DAY, name, level, instructorId }] })),
-      moveChild: (childId, groupId) =>
-        update((d) => {
-          const todayGroupIds = new Set(d.groups.filter((g) => g.lessonDayId === TODAY_LESSON_DAY).map((g) => g.id));
-          const rest = d.groupMembers.filter((m) => !(m.childId === childId && todayGroupIds.has(m.groupId)));
-          return { ...d, groupMembers: groupId ? [...rest, { groupId, childId }] : rest };
-        }),
+      addGroup: (name, level, instructorId) => sendGroups(userId, { action: 'addGroup', name, level, instructorId }),
+      moveChild: (childId, groupId) => sendGroups(userId, { action: 'moveChild', childId, groupId }),
       importRows: (rows) => {
         // Matched on the store's order number: existing children are updated, never duplicated.
         const known = new Set(data.children.map((c) => c.orderNumber));
@@ -413,7 +449,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday, sendGroups]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
