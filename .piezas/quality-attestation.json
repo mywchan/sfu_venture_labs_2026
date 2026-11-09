@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "kind": "quality-scan",
+  "scanId": "412c7422e5d9",
+  "cycle": "32c2e96c8750",
+  "round": 3,
+  "nonce": "qs-191ff55cd5318978af",
+  "packetHash": "8629ef3e2d9de50b4e55119787b338c3a085bf5e74591ffb7812a201e24cb357",
+  "sourceFingerprint": "2dd7b6e1614c0b452f2047a8e5a66fd7091893d8a8b7453efd11ab2d17057a50",
+  "specFingerprint": "3bb17bcc5bc3007b158261e9bd6124592ab68410f5d5c4d3e4b8a6c1995232a3",
+  "ranAt": "2026-11-09T00:38:06.355Z",
+  "validUntil": "2026-11-10T00:38:06.355Z",
+  "findings": [
+    {
+      "n": 1,
+      "severity": "high",
+      "plain": "Anyone can still get into any role: the sign-in accepts any password with a code printed on the page, and buttons on the first screen open a parent, instructor, patrol or administrator account with no sign-in at all.",
+      "file": "app/page.tsx",
+      "previous": 1,
+      "key": "61ccc8df11e44cd4456b03bf",
+      "status": "open"
+    },
+    {
+      "n": 2,
+      "severity": "high",
+      "plain": "When someone reports a child missing, only that one browser window knows about it, so no patroller is alerted even though the reporter is told \"Ski patrol has been alerted.\"",
+      "file": "lib/store.tsx",
+      "previous": 2,
+      "key": "3c689061dd21c2577f4a3cda",
+      "status": "open"
+    },
+    {
+      "n": 3,
+      "severity": "high",
+      "plain": "A parent's new allergy, a signed consent form, a check-in, a clothing change, a pickup, a refused pickup, or the administrator's groups and spreadsheet upload never reach anyone else's screen and are lost on reload, so staff can act on old information.",
+      "file": "lib/store.tsx",
+      "previous": 3,
+      "key": "9964f33c79e2181a04595805",
+      "status": "open"
+    },
+    {
+      "n": 4,
+      "severity": "high",
+      "plain": "Every family's medical details and contacts are sent to the browser of every signed-in person, and only the screen layout hides them, so a parent, the desk or patrol with no open search could still get at them.",
+      "file": "lib/store.tsx",
+      "previous": 4,
+      "key": "3d6ad699509e58b2eee373a9",
+      "status": "open"
+    },
+    {
+      "n": 5,
+      "severity": "high",
+      "plain": "Patrol is still given every family's saved contacts and pickup adults at all times, even when no search is open, instead of only during a search.",
+      "file": "app/api/guardians/route.ts",
+      "previous": 5,
+      "key": "74a81b87cbd6fedba27d5854",
+      "status": "open"
+    },
+    {
+      "n": 6,
+      "severity": "high",
+      "plain": "On the live site parents cannot save or see saved contacts and pickup adults at all, and the desk and patrol would always see a \"can't reach\" warning, because that saving only works on the builder's own computer until real sign-in exists.",
+      "file": "app/api/guardians/route.ts",
+      "previous": 6,
+      "key": "dcb44aab3ea3db903988d33b",
+      "status": "open"
+    },
+    {
+      "n": 7,
+      "severity": "high",
+      "plain": "Parents have no way to get an account: there is no welcome email or set-password page, the 6-digit code is never emailed, and the store spreadsheet does not link a new child to any parent.",
+      "file": "app/admin/page.tsx",
+      "previous": 7,
+      "key": "00ab24a76fb8c994341da449",
+      "status": "open"
+    },
+    {
+      "n": 8,
+      "severity": "high",
+      "plain": "The administrator cannot create staff accounts or give anyone a role, so no real instructor, desk or patrol person can be added.",
+      "file": "app/admin/page.tsx",
+      "previous": 8,
+      "key": "0487a0a6680ad42f00f0c956",
+      "status": "open"
+    },
+    {
+      "n": 9,
+      "severity": "high",
+      "plain": "An instructor who opens the app on the hill with no wifi gets nothing, because the saved group only shows if the page was already open and signed in when the connection dropped.",
+      "file": "components/OfflineCopy.tsx",
+      "previous": 9,
+      "key": "f3700a01e3a1cfcb16f2771b",
+      "status": "open"
+    },
+    {
+      "n": 10,
+      "severity": "high",
+      "plain": "The app runs on a made-up clock that always says Saturday, December 12 and restarts at 1:35 p.m., so the police countdown, consent signing dates and the 4 p.m. delete would be wrong on a real day.",
+      "file": "lib/store.tsx",
+      "previous": 10,
+      "key": "b62abb6d3ebbfe827be9ab98",
+      "status": "open"
+    },
+    {
+      "n": 11,
+      "severity": "high",
+      "plain": "The administrator can only change a child's name, level and day, and cannot edit the child's contacts, pickup adults, medical alerts or consent form.",
+      "file": "app/admin/page.tsx",
+      "previous": 11,
+      "key": "d785f580230fe6d6f04091d0",
+      "status": "open"
+    },
+    {
+      "n": 12,
+      "severity": "high",
+      "plain": "The administrator cannot manage lesson days or build groups for any day other than the one Saturday, and Sunday children cannot be found at the desk or placed in a group.",
+      "file": "app/admin/page.tsx",
+      "previous": 12,
+      "key": "0e6c2a9a1c642d796c936419",
+      "status": "open"
+    },
+    {
+      "n": 13,
+      "severity": "high",
+      "plain": "The record of who viewed medical details or opened a child during a search stays only in that person's own browser window, so the administrator never sees it and it disappears on reload.",
+      "file": "lib/store.tsx",
+      "previous": 13,
+      "key": "ba55c428fade8a517d613cdc",
+      "status": "open"
+    },
+    {
+      "n": 14,
+      "severity": "medium",
+      "plain": "None of the 27 agreed checks has been written and no test run exists, so nothing the owner approved has been proven to work, and the test copy has no sample families to check against.",
+      "file": "tests/scenarios",
+      "previous": 14,
+      "key": "aa56ecc9b22c74985cebdc77",
+      "status": "open"
+    },
+    {
+      "n": 15,
+      "severity": "medium",
+      "plain": "If one parent turns off pickup permission for an adult and the other parent saves any change a few seconds later, that adult goes back to being approved for pickup with no warning to anyone.",
+      "file": "lib/server/guardians.ts",
+      "previous": 16,
+      "key": "4c5db0e46c5b0b0fa645241c",
+      "status": "open"
+    },
+    {
+      "n": 16,
+      "severity": "medium",
+      "plain": "No child photo can be added anywhere, so patrol never sees a real photo during a search even when the parent gave photo consent, only the child's initials.",
+      "file": "app/patrol/page.tsx",
+      "previous": 17,
+      "key": "92bbd0e77b00385dad204ff4",
+      "status": "open"
+    }
+  ],
+  "fixedFromPrevious": {
+    "fixed": 1,
+    "of": 17
+  },
+  "status": "stopped",
+  "stoppedAfterRounds": 3
+}

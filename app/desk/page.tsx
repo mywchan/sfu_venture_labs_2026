@@ -101,7 +101,7 @@ function Desk() {
 }
 
 function ChildPanel({ child }: { child: Child }) {
-  const { data, checkIn, release, refusePickup } = useStore();
+  const { data, checkIn, release, refusePickup, guardianLink } = useStore();
   const a = todaysAttendance(data, child.id);
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
@@ -112,6 +112,7 @@ function ChildPanel({ child }: { child: Child }) {
   const [otherName, setOtherName] = useState('');
   const [askOther, setAskOther] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const [onList, setOnList] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const search = openSearchFor(data, child.id);
 
@@ -155,11 +156,21 @@ function ChildPanel({ child }: { child: Child }) {
 
       {a?.checkInAt && !a.pickupAt && !search && (
         <div data-testid="pickup-panel">
+          {guardianLink === 'offline' && (
+            <div className="banner danger" data-testid="guardians-stale">
+              Can’t reach Peak Pals, so this list may be out of date. Call a parent to confirm before releasing {child.firstName}.
+            </div>
+          )}
           <h3>Pickup: approved adults</h3>
           <p className="small muted">Ask for photo ID if you don’t recognize the adult.</p>
           {refused && (
             <div className="banner danger" data-testid="pickup-refused">
               {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. The attempt has been recorded. Call a parent below.
+            </div>
+          )}
+          {onList && (
+            <div className="banner ok" data-testid="pickup-on-list">
+              {onList} is on {child.firstName}’s pickup list. Check their photo ID, then use their Release button.
             </div>
           )}
           <div className="stack">
@@ -178,8 +189,17 @@ function ChildPanel({ child }: { child: Child }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!otherName.trim()) return;
-                refusePickup(child.id, otherName.trim());
-                setRefused(otherName.trim());
+                // Only a name that isn't on the approved list counts as a refusal.
+                const tidy = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+                const approved = adults.find((x) => x.link.canPickUp && tidy(x.person.name) === tidy(otherName));
+                if (approved) {
+                  setOnList(approved.person.name);
+                  setRefused(null);
+                } else {
+                  refusePickup(child.id, otherName.trim());
+                  setRefused(otherName.trim());
+                  setOnList(null);
+                }
                 setOtherName('');
                 setAskOther(false);
               }}

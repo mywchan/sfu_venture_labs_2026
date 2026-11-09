@@ -1,8 +1,9 @@
 'use client';
 
-// Preview-only state. Everything lives in the browser tab's memory and resets
-// when the page is reloaded. In the real build each change below becomes a
-// call to Piezas made from the server, after checking the signed-in person's role.
+// The app's working state. Adults linked to a child (guardians, emergency
+// contacts, pickup adults) are saved in Peak Pals through /api/guardians.
+// Everything else is still preview-only: it lives in this browser tab's memory
+// and resets on reload, until each piece is connected the same way.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { groupForInstructor } from './access';
@@ -34,8 +35,10 @@ type Store = {
   signIn: (userId: string) => void;
   signOut: () => void;
   // parent
-  savePerson: (childId: string, person: Person, link: Omit<ChildPerson, 'id' | 'childId' | 'personId'>, linkId?: string) => void;
-  removeLink: (linkId: string) => void;
+  guardianLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for adults?
+  sessionChecked: boolean; // false until we've looked up who is signed in
+  savePerson: (childId: string, person: Person, link: Omit<ChildPerson, 'id' | 'childId' | 'personId'>, linkId?: string) => Promise<void>;
+  removeLink: (linkId: string) => Promise<void>;
   saveMedical: (alert: Omit<MedicalAlert, 'id'>, id?: string) => void;
   removeMedical: (id: string) => void;
   setNoMedical: (childId: string, value: boolean) => void;
@@ -80,6 +83,32 @@ function renumberContacts(rows: ChildPerson[], childId: string, movedId?: string
   });
 }
 
+// What the server sends back for each saved adult (see lib/server/guardians.ts).
+type GuardianRow = {
+  linkId: string;
+  personId: string;
+  childId: string;
+  name: string;
+  phone: string;
+  email: string;
+  relationship: string;
+  contactOrder: number | null;
+  canPickUp: boolean;
+};
+
+/** Replaces the listed children's adults with what Peak Pals has saved. */
+function applyGuardians(d: Data, rows: GuardianRow[], childIds: Set<string>): Data {
+  const incoming = new Map(rows.map((r) => [r.personId, { id: r.personId, name: r.name, phone: r.phone, email: r.email }]));
+  return {
+    ...d,
+    persons: [...d.persons.filter((p) => !incoming.has(p.id)), ...incoming.values()],
+    childPersons: [
+      ...d.childPersons.filter((cp) => !childIds.has(cp.childId)),
+      ...rows.map((r) => ({ id: r.linkId, childId: r.childId, personId: r.personId, relationship: r.relationship, contactOrder: r.contactOrder, canPickUp: r.canPickUp })),
+    ],
+  };
+}
+
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -87,6 +116,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [meId, setMeId] = useState<string | null>(null);
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(() => new Date(CLOCK_START));
+  const [guardianLink, setGuardianLink] = useState<'checking' | 'connected' | 'offline'>('checking');
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date(CLOCK_START + (Date.now() - started))), 1000);
@@ -101,6 +132,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage unavailable: stay signed out */
     }
+    setSessionChecked(true);
   }, []);
 
   const me = data.users.find((u) => u.id === meId) ?? null;
@@ -111,6 +143,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }, [started]);
   const update = useCallback((fn: (d: Data) => Data) => setData((d) => fn(d)), []);
+
+  // Adults come from Peak Pals: loaded on sign-in, then re-checked every 10
+  // seconds so a change made on another device shows up here.
+  useEffect(() => {
+    if (!meId) return;
+    let stopped = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/guardians?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(String(res.status));
+        const { guardians } = (await res.json()) as { guardians: GuardianRow[] };
+        if (stopped) return;
+        setData((d) => applyGuardians(d, guardians, new Set(guardians.map((g) => g.childId))));
+        setGuardianLink('connected');
+      } catch {
+        if (!stopped) setGuardianLink('offline');
+      }
+    };
+    void load();
+    const t = setInterval(load, 10_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId]);
+
+  /** Sends a child's full list to Peak Pals. The screen only changes once it's saved. */
+  const pushGuardians = useCallback(async (next: Data, childId: string, asUserId: string, removedLinkIds: string[] = []) => {
+    const guardians = next.childPersons
+      .filter((cp) => cp.childId === childId)
+      .map((cp) => {
+        const p = next.persons.find((x) => x.id === cp.personId);
+        return { linkId: cp.id, name: p?.name ?? '', phone: p?.phone ?? '', email: p?.email ?? '', relationship: cp.relationship, contactOrder: cp.contactOrder, canPickUp: cp.canPickUp };
+      });
+    const res = await fetch('/api/guardians', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ as: asUserId, childId, guardians, removedLinkIds }),
+    });
+    if (res.status === 404) throw new Error('Saving is only switched on for local testing until real sign-in is ready.');
+    const body = (await res.json().catch(() => ({}))) as { guardians?: GuardianRow[]; error?: string };
+    if (!res.ok || !body.guardians) throw new Error(body.error ?? 'That didn’t save. Please try again.');
+    const saved = body.guardians;
+    setData((d) => applyGuardians(d, saved, new Set([childId])));
+    setGuardianLink('connected');
+  }, []);
 
   const store = useMemo<Store>(() => {
     const userId = me?.id ?? '';
@@ -140,22 +218,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           /* ignore */
         }
       },
-      savePerson: (childId, person, link, linkId) =>
-        update((d) => {
-          const persons = d.persons.some((p) => p.id === person.id)
-            ? d.persons.map((p) => (p.id === person.id ? person : p))
-            : [...d.persons, person];
-          const rowId = linkId ?? newId('cp');
-          const row: ChildPerson = { id: rowId, childId, personId: person.id, ...link };
-          const childPersons = linkId ? d.childPersons.map((cp) => (cp.id === linkId ? row : cp)) : [...d.childPersons, row];
-          return { ...d, persons, childPersons: renumberContacts(childPersons, childId, rowId, link.contactOrder) };
-        }),
-      removeLink: (linkId) =>
-        update((d) => {
-          const childId = d.childPersons.find((cp) => cp.id === linkId)?.childId;
-          const rest = d.childPersons.filter((cp) => cp.id !== linkId);
-          return { ...d, childPersons: childId ? renumberContacts(rest, childId) : rest };
-        }),
+      guardianLink,
+      sessionChecked,
+      savePerson: async (childId, person, link, linkId) => {
+        const persons = data.persons.some((p) => p.id === person.id)
+          ? data.persons.map((p) => (p.id === person.id ? person : p))
+          : [...data.persons, person];
+        const rowId = linkId ?? newId('cp');
+        const row: ChildPerson = { id: rowId, childId, personId: person.id, ...link };
+        const links = linkId ? data.childPersons.map((cp) => (cp.id === linkId ? row : cp)) : [...data.childPersons, row];
+        await pushGuardians({ ...data, persons, childPersons: renumberContacts(links, childId, rowId, link.contactOrder) }, childId, userId);
+      },
+      removeLink: async (linkId) => {
+        const childId = data.childPersons.find((cp) => cp.id === linkId)?.childId;
+        if (!childId) return;
+        const rest = data.childPersons.filter((cp) => cp.id !== linkId);
+        await pushGuardians({ ...data, childPersons: renumberContacts(rest, childId) }, childId, userId, [linkId]);
+      },
       saveMedical: (alert, id) =>
         update((d) => ({
           ...d,
@@ -283,7 +362,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, pushGuardians]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

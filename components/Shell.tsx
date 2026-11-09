@@ -23,13 +23,15 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 /** Page frame for a signed-in role. Anyone of another role is sent to their own screens. */
 export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean; children: ReactNode }) {
-  const { me, now, signOut } = useStore();
+  const { me, now, signOut, sessionChecked } = useStore();
   const router = useRouter();
 
   useEffect(() => {
+    // Wait until we know who is signed in, so a reload stays on the same page.
+    if (!sessionChecked) return;
     if (!me) router.replace('/');
     else if (me.role !== role) router.replace(ROLE_HOME[me.role]);
-  }, [me, role, router]);
+  }, [me, role, router, sessionChecked]);
 
   if (!me || me.role !== role) return <main className="narrow muted">Loading…</main>;
 

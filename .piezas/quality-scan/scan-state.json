@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "pending": null,
+  "cycle": {
+    "id": "32c2e96c8750",
+    "startedAt": "2026-11-09T00:29:29.780Z",
+    "rounds": 3,
+    "ended": true,
+    "budgetReported": true,
+    "budgetFingerprint": "2dd7b6e1614c0b452f2047a8e5a66fd7091893d8a8b7453efd11ab2d17057a50"
+  },
+  "consentAskedAt": null,
+  "hold": null,
+  "deployWanted": null,
+  "lastStop": {
+    "event": "c821af0f5f02ef4cb8ddef9945ac96f7240d76d2",
+    "at": "2026-11-09T00:38:22.290Z",
+    "answer": {
+      "systemMessage": "Quality scan: stopped after 3 rounds of fixes. Still open:\n1. Anyone can still get into any role: the sign-in accepts any password with a code printed on the page, and buttons on the first screen open a parent, instructor, patrol or administrator account with no sign-in at all.\n2. When someone reports a child missing, only that one browser window knows about it, so no patroller is alerted even though the reporter is told \"Ski patrol has been alerted.\"\n3. A parent's new allergy, a signed consent form, a check-in, a clothing change, a pickup, a refused pickup, or the administrator's groups and spreadsheet upload never reach anyone else's screen and are lost on reload, so staff can act on old information.\n4. Every family's medical details and contacts are sent to the browser of every signed-in person, and only the screen layout hides them, so a parent, the desk or patrol with no open search could still get at them.\n5. Patrol is still given every family's saved contacts and pickup adults at all times, even when no search is open, instead of only during a search.\n6. On the live site parents cannot save or see saved contacts and pickup adults at all, and the desk and patrol would always see a \"can't reach\" warning, because that saving only works on the builder's own computer until real sign-in exists.\n7. Parents have no way to get an account: there is no welcome email or set-password page, the 6-digit code is never emailed, and the store spreadsheet does not link a new child to any parent.\n8. The administrator cannot create staff accounts or give anyone a role, so no real instructor, desk or patrol person can be added.\n9. An instructor who opens the app on the hill with no wifi gets nothing, because the saved group only shows if the page was already open and signed in when the connection dropped.\n10. The app runs on a made-up clock that always says Saturday, December 12 and restarts at 1:35 p.m., so the police countdown, consent signing dates and the 4 p.m. delete would be wrong on a real day.\n11. The administrator can only change a child's name, level and day, and cannot edit the child's contacts, pickup adults, medical alerts or consent form.\n12. The administrator cannot manage lesson days or build groups for any day other than the one Saturday, and Sunday children cannot be found at the desk or placed in a group.\n13. The record of who viewed medical details or opened a child during a search stays only in that person's own browser window, so the administrator never sees it and it disappears on reload.\n14. None of the 27 agreed checks has been written and no test run exists, so nothing the owner approved has been proven to work, and the test copy has no sample families to check against.\n15. If one parent turns off pickup permission for an adult and the other parent saves any change a few seconds later, that adult goes back to being approved for pickup with no warning to anyone.\n16. No child photo can be added anywhere, so patrol never sees a real photo during a search even when the parent gave photo consent, only the child's initials.\nSay \"accept\" and the number (or \"accept all\") to go on without it."
+    }
+  },
+  "waits": null,
+  "shownList": {
+    "scanId": "412c7422e5d9",
+    "items": [
+      {
+        "n": 1,
+        "key": "61ccc8df11e44cd4456b03bf",
+        "plain": "Anyone can still get into any role: the sign-in accepts any password with a code printed on the page, and buttons on the first screen open a parent, instructor, patrol or administrator account with no sign-in at all.",
+        "severity": "high"
+      },
+      {
+        "n": 2,
+        "key": "3c689061dd21c2577f4a3cda",
+        "plain": "When someone reports a child missing, only that one browser window knows about it, so no patroller is alerted even though the reporter is told \"Ski patrol has been alerted.\"",
+        "severity": "high"
+      },
+      {
+        "n": 3,
+        "key": "9964f33c79e2181a04595805",
+        "plain": "A parent's new allergy, a signed consent form, a check-in, a clothing change, a pickup, a refused pickup, or the administrator's groups and spreadsheet upload never reach anyone else's screen and are lost on reload, so staff can act on old information.",
+        "severity": "high"
+      },
+      {
+        "n": 4,
+        "key": "3d6ad699509e58b2eee373a9",
+        "plain": "Every family's medical details and contacts are sent to the browser of every signed-in person, and only the screen layout hides them, so a parent, the desk or patrol with no open search could still get at them.",
+        "severity": "high"
+      },
+      {
+        "n": 5,
+        "key": "74a81b87cbd6fedba27d5854",
+        "plain": "Patrol is still given every family's saved contacts and pickup adults at all times, even when no search is open, instead of only during a search.",
+        "severity": "high"
+      },
+      {
+        "n": 6,
+        "key": "dcb44aab3ea3db903988d33b",
+        "plain": "On the live site parents cannot save or see saved contacts and pickup adults at all, and the desk and patrol would always see a \"can't reach\" warning, because that saving only works on the builder's own computer until real sign-in exists.",
+        "severity": "high"
+      },
+      {
+        "n": 7,
+        "key": "00ab24a76fb8c994341da449",
+        "plain": "Parents have no way to get an account: there is no welcome email or set-password page, the 6-digit code is never emailed, and the store spreadsheet does not link a new child to any parent.",
+        "severity": "high"
+      },
+      {
+        "n": 8,
+        "key": "0487a0a6680ad42f00f0c956",
+        "plain": "The administrator cannot create staff accounts or give anyone a role, so no real instructor, desk or patrol person can be added.",
+        "severity": "high"
+      },
+      {
+        "n": 9,
+        "key": "f3700a01e3a1cfcb16f2771b",
+        "plain": "An instructor who opens the app on the hill with no wifi gets nothing, because the saved group only shows if the page was already open and signed in when the connection dropped.",
+        "severity": "high"
+      },
+      {
+        "n": 10,
+        "key": "b62abb6d3ebbfe827be9ab98",
+        "plain": "The app runs on a made-up clock that always says Saturday, December 12 and restarts at 1:35 p.m., so the police countdown, consent signing dates and the 4 p.m. delete would be wrong on a real day.",
+        "severity": "high"
+      },
+      {
+        "n": 11,
+        "key": "d785f580230fe6d6f04091d0",
+        "plain": "The administrator can only change a child's name, level and day, and cannot edit the child's contacts, pickup adults, medical alerts or consent form.",
+        "severity": "high"
+      },
+      {
+        "n": 12,
+        "key": "0e6c2a9a1c642d796c936419",
+        "plain": "The administrator cannot manage lesson days or build groups for any day other than the one Saturday, and Sunday children cannot be found at the desk or placed in a group.",
+        "severity": "high"
+      },
+      {
+        "n": 13,
+        "key": "ba55c428fade8a517d613cdc",
+        "plain": "The record of who viewed medical details or opened a child during a search stays only in that person's own browser window, so the administrator never sees it and it disappears on reload.",
+        "severity": "high"
+      },
+      {
+        "n": 14,
+        "key": "aa56ecc9b22c74985cebdc77",
+        "plain": "None of the 27 agreed checks has been written and no test run exists, so nothing the owner approved has been proven to work, and the test copy has no sample families to check against.",
+        "severity": "medium"
+      },
+      {
+        "n": 15,
+        "key": "4c5db0e46c5b0b0fa645241c",
+        "plain": "If one parent turns off pickup permission for an adult and the other parent saves any change a few seconds later, that adult goes back to being approved for pickup with no warning to anyone.",
+        "severity": "medium"
+      },
+      {
+        "n": 16,
+        "key": "92bbd0e77b00385dad204ff4",
+        "plain": "No child photo can be added anywhere, so patrol never sees a real photo during a search even when the parent gave photo consent, only the child's initials.",
+        "severity": "medium"
+      }
+    ]
+  },
+  "deployScanTries": null
+}

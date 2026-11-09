@@ -80,7 +80,7 @@ function Patrol() {
 }
 
 function SearchScreen({ em }: { em: Emergency }) {
-  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess } = useStore();
+  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess, guardianLink } = useStore();
   const child = data.children.find((c) => c.id === em.childId)!;
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
@@ -168,14 +168,19 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
 
         <section className="card" data-testid="search-contacts">
+          {guardianLink === 'offline' && (
+            <div className="banner danger" data-testid="guardians-stale">Can’t reach Peak Pals, so these contacts may be out of date.</div>
+          )}
           <h3>Emergency contacts</h3>
           {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
             <p key={link.id}>
               <strong>{link.contactOrder}. {person.name}</strong> ({link.relationship})<br />
               <a href={`tel:${person.phone}`}>{person.phone}</a>
+              <br />
+              <span className={`chip ${link.canPickUp ? 'ok' : ''}`}>{link.canPickUp ? 'Can pick up' : 'Not allowed to pick up'}</span>
             </p>
           ))}
-          <h3>Also allowed to pick up</h3>
+          <h3>Other adults allowed to pick up</h3>
           <p className="small">{adults.filter((x) => x.link.canPickUp && !x.link.contactOrder).map((x) => `${x.person.name} (${x.link.relationship})`).join(', ') || 'No one else'}</p>
         </section>
       </div>

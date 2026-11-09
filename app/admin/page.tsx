@@ -138,6 +138,11 @@ function GroupsTab() {
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
+          if (groups.some((g) => g.instructorId === instructorId)) {
+            setError(`${userName(data, instructorId)} already has a group today. An instructor teaches one group at a time.`);
+            return;
+          }
+          setError(null);
           addGroup(name.trim(), level, instructorId);
           setName('');
         }}
