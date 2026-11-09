@@ -81,10 +81,16 @@ export function instructorOf(roster: Data, childId: string) {
   return groupOfChild(roster, childId)?.instructorId ?? null;
 }
 
-/** Everyone sees the groups; a parent only sees where their own children are. */
+/** Everyone sees the groups; parents and instructors only see their own children in them. */
 export async function readRoster(user: User) {
   const roster = await currentRoster();
-  const groupMembers = user.role === 'parent' ? roster.groupMembers.filter((m) => parentOwnsChild(seedData, user, m.childId)) : roster.groupMembers;
+  const ownGroup = user.role === 'instructor' ? groupForInstructor(roster, user).group?.id : null;
+  const groupMembers =
+    user.role === 'parent'
+      ? roster.groupMembers.filter((m) => parentOwnsChild(seedData, user, m.childId))
+      : user.role === 'instructor'
+        ? roster.groupMembers.filter((m) => m.groupId === ownGroup)
+        : roster.groupMembers;
   return { groups: roster.groups, groupMembers };
 }
 
