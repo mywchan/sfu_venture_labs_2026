@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ColourPicker } from '@/components/ColourPicker';
 import { ReportMissing } from '@/components/ReportMissing';
 import { Shell } from '@/components/Shell';
 import { adultsFor, fullName, groupOfChild, openSearchFor, timeLabel, todaysAttendance, userName } from '@/lib/access';
@@ -132,20 +133,9 @@ function ChildPanel({ child }: { child: Child }) {
         >
           <h3>Check in</h3>
           <p className="small muted">Note today’s clothing: patrol uses it if {child.firstName} goes missing.</p>
-          <div className="grid2">
-            <div className="field">
-              <label htmlFor="jacket">Jacket colour</label>
-              <input id="jacket" value={jacket} onChange={(e) => setJacket(e.target.value)} data-testid="checkin-jacket" />
-            </div>
-            <div className="field">
-              <label htmlFor="pants">Pants colour</label>
-              <input id="pants" value={pants} onChange={(e) => setPants(e.target.value)} data-testid="checkin-pants" />
-            </div>
-            <div className="field">
-              <label htmlFor="helmet">Helmet colour</label>
-              <input id="helmet" value={helmet} onChange={(e) => setHelmet(e.target.value)} data-testid="checkin-helmet" />
-            </div>
-          </div>
+          <ColourPicker id="jacket" label="Jacket colour" value={jacket} onChange={setJacket} testId="checkin-jacket" />
+          <ColourPicker id="pants" label="Pants colour" value={pants} onChange={setPants} testId="checkin-pants" />
+          <ColourPicker id="helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="checkin-helmet" />
           <button className="primary big" type="submit" disabled={!clothingDone} data-testid="checkin-submit">Check in {child.firstName}</button>
         </form>
       )}
@@ -153,6 +143,7 @@ function ChildPanel({ child }: { child: Child }) {
       {a?.checkInAt && (
         <div className="banner ok" data-testid="checkin-status">
           Checked in at {timeLabel(a.checkInAt)} by {userName(data, a.checkedInBy)} · {a.jacket} jacket, {a.pants} pants, {a.helmet} helmet
+          {a.clothingFixedAt && <div className="small" data-testid="clothing-fixed-note">Clothing corrected at {timeLabel(a.clothingFixedAt)} by {userName(data, a.clothingFixedBy ?? null)}</div>}
         </div>
       )}
 

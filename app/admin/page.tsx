@@ -189,6 +189,12 @@ function ChildrenTab() {
                         {timeLabel(a.checkInAt)} by {userName(data, a.checkedInBy)}
                         <br />
                         Jacket {a.jacket} · Pants {a.pants} · Helmet {a.helmet}
+                        {a.clothingFixedAt && (
+                          <>
+                            <br />
+                            <span className="muted">Corrected {timeLabel(a.clothingFixedAt)} by {userName(data, a.clothingFixedBy ?? null)}</span>
+                          </>
+                        )}
                       </>
                     ) : (
                       <span className="muted">Not checked in</span>

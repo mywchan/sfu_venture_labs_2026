@@ -50,7 +50,14 @@ export function adultsFor(d: Data, childId: string) {
     .filter((cp) => cp.childId === childId)
     .map((cp) => ({ link: cp, person: d.persons.find((p) => p.id === cp.personId)! }))
     .filter((x) => x.person)
-    .sort((a, b) => (a.link.contactOrder ?? 9) - (b.link.contactOrder ?? 9));
+    .sort((a, b) => (a.link.contactOrder ?? Infinity) - (b.link.contactOrder ?? Infinity));
+}
+
+/** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "4th", 11 -> "11th" ... */
+export function ordinal(n: number) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 }
 
 export function userName(d: Data, userId: string | null) {

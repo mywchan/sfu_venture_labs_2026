@@ -33,8 +33,8 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 |---|---|---|---|---|
 | 2.1 | Your children | `/parent` | Built | One card per child: name, age, level, day, group. A "1 to finish" chip with the list of what's missing (R-004, R-027). |
 | 2.2 | Child: Lessons | `/parent/[childId]` (tab) | Built | Today's group and instructor, check-in time, pickup time and who picked them up, the season's lesson dates (R-010). |
-| 2.3 | Child: Contacts & pickup | same, tab | Built | List of adults: relationship, phone, email, "Emergency contact 1/2" chip, "Can pick up" chip. Edit and Remove on each (R-005). |
-| 2.4 | Add or edit an adult | same, form | Built | Name, relationship, phone (checked: must be 10 digits, R-009), email (optional), emergency contact (none, 1st or 2nd), "Allowed to pick up" checkbox. Choosing 1st or 2nd moves that label off whoever had it. |
+| 2.3 | Child: Contacts & pickup | same, tab | Built | List of adults: relationship, phone, email, "Emergency contact 1/2/3…" chip, "Can pick up" chip. Edit and Remove on each (R-005). |
+| 2.4 | Add or edit an adult | same, form | Built | Name, relationship, phone (checked: must be 10 digits, R-009), email (optional), emergency contact (none, or a position: the list always offers one more than there are contacts, so 3rd appears once there are 2, 4th once there are 3), "Allowed to pick up" checkbox. Choosing a position someone holds moves them and everyone after them down one. Removing a contact closes the gap. |
 | 2.5 | Child: Medical | same, tab | Built | Each alert shows the short alert line coloured by severity, the details and the medication location. A "no allergies or conditions" checkbox when there are none (R-006). |
 | 2.6 | Add or edit an alert | same, form | Built | Short alert (one line for the instructor), details, where medication is kept, how serious (life-threatening, needs attention, good to know). |
 | 2.7 | Child: Consent form | same, tab | Built | Consent text, optional photo consent, "I agree", type full name to sign. After signing: a read-only summary (R-008). |
@@ -51,13 +51,14 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 | 3.4 | Save for offline | `/instructor` (card) | Built | "Save for offline" button. Once saved: the time it was saved, "Update saved copy", "View offline copy", "Delete" (R-032). |
 | 3.5 | Offline copy | `/instructor` (no connection) | Partly built | Read-only group list with a warning: "No connection. Showing your offline copy (saved 1:35 p.m.)." Real build: the page must also load from scratch with no wifi (offline web app), not just while it's already open. |
 | 3.6 | No group today | `/instructor` | Built | "You aren't teaching a group today." |
+| 3.7 | Fix clothing | `/instructor` (sheet) | Built | "Fix clothing" on each checked-in child in the instructor's own group. Same colour buttons and text box as check-in. Saves who corrected it and when, and updates patrol's screen if a search is open (R-034). Needs a connection. |
 
 ## 4. Desk / receptionist (laptop or tablet at the counter)
 
 | # | Screen | Address | Status | What it does |
 |---|---|---|---|---|
 | 4.1 | Check-in and pickup | `/desk` | Built | Counts at top ("11 of 16 checked in", "0 gone home"). Search by name or bib on the left, child panel on the right. **Never shows medical information** (R-015, R-018). |
-| 4.2 | Check in | `/desk` (panel) | Built | Jacket, pants and helmet colour (all required), then "Check in". Afterwards: "Checked in at 8:38 a.m. by Mei Tanaka · Pink jacket, Purple pants, Pink helmet." |
+| 4.2 | Check in | `/desk` (panel) | Built | Jacket, pants and helmet colour (all required): tap one of 12 colour buttons or type in the box (`components/ColourPicker.tsx`), then "Check in". Afterwards: "Checked in at 8:38 a.m. by Mei Tanaka · Pink jacket, Purple pants, Pink helmet." |
 | 4.3 | Pickup | `/desk` (panel) | Built | One big "Release to <name> (<relationship>)" button per approved adult, with phone. "Ask for photo ID" hint. Afterwards: who took them and who released them (R-016). |
 | 4.4 | Someone else is here | `/desk` (panel) | Built | "Name the adult gave", then "Check". Shows a red warning ("…is NOT on Lily's pickup list. Do not release…") and records the attempt (R-017). |
 | 4.5 | Pickups refused today | `/desk` (bottom) | Built | Table: time, child, adult who asked, staff member. |
@@ -97,7 +98,7 @@ Every screen the portal needs, grouped by role. Built from [SPEC.md](../SPEC.md)
 
 ## Summary
 
-- **47 screens and parts of screens.** 32 are built, 5 are partly built, and 10 are not built.
+- **48 screens and parts of screens.** 33 are built, 5 are partly built, and 10 are not built.
 - **Most important new screens:**
   - staff accounts (6.6): no one can create an instructor without it;
   - welcome / set password (1.3): parents can't get in without it;

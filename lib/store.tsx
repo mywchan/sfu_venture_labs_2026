@@ -5,6 +5,7 @@
 // call to Piezas made from the server, after checking the signed-in person's role.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { groupForInstructor } from './access';
 import {
   seedData,
   TODAY,
@@ -41,6 +42,7 @@ type Store = {
   signConsent: (form: ConsentForm) => void;
   // instructor
   logAccess: (what: string, childId: string) => void;
+  fixClothing: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
   // desk
   checkIn: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
   release: (childId: string, personId: string) => void;
@@ -59,6 +61,24 @@ type Store = {
 };
 
 export type ImportRow = { orderNumber: string; firstName: string; lastName: string; birthDate: string; level: number; programDay: 'Saturday' | 'Sunday' };
+
+/**
+ * Keeps a child's emergency contacts numbered 1, 2, 3... with no gaps.
+ * If `movedId` takes a position someone already holds, that person and
+ * everyone after them shift down one; nobody loses their place on the list.
+ */
+function renumberContacts(rows: ChildPerson[], childId: string, movedId?: string, position?: number | null): ChildPerson[] {
+  const ordered = rows
+    .filter((cp) => cp.childId === childId && cp.contactOrder !== null && cp.id !== movedId)
+    .sort((a, b) => (a.contactOrder ?? 0) - (b.contactOrder ?? 0))
+    .map((cp) => cp.id);
+  if (movedId && position) ordered.splice(position - 1, 0, movedId);
+  return rows.map((cp) => {
+    if (cp.childId !== childId) return cp;
+    const i = ordered.indexOf(cp.id);
+    return { ...cp, contactOrder: i >= 0 ? i + 1 : null };
+  });
+}
 
 const Ctx = createContext<Store | null>(null);
 
@@ -125,19 +145,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const persons = d.persons.some((p) => p.id === person.id)
             ? d.persons.map((p) => (p.id === person.id ? person : p))
             : [...d.persons, person];
-          let childPersons = d.childPersons;
-          // Only one person can be 1st (or 2nd) emergency contact for a child.
-          if (link.contactOrder) {
-            childPersons = childPersons.map((cp) =>
-              cp.childId === childId && cp.contactOrder === link.contactOrder && cp.id !== linkId ? { ...cp, contactOrder: null } : cp,
-            );
-          }
-          childPersons = linkId
-            ? childPersons.map((cp) => (cp.id === linkId ? { ...cp, ...link, personId: person.id } : cp))
-            : [...childPersons, { id: newId('cp'), childId, personId: person.id, ...link }];
-          return { ...d, persons, childPersons };
+          const rowId = linkId ?? newId('cp');
+          const row: ChildPerson = { id: rowId, childId, personId: person.id, ...link };
+          const childPersons = linkId ? d.childPersons.map((cp) => (cp.id === linkId ? row : cp)) : [...d.childPersons, row];
+          return { ...d, persons, childPersons: renumberContacts(childPersons, childId, rowId, link.contactOrder) };
         }),
-      removeLink: (linkId) => update((d) => ({ ...d, childPersons: d.childPersons.filter((cp) => cp.id !== linkId) })),
+      removeLink: (linkId) =>
+        update((d) => {
+          const childId = d.childPersons.find((cp) => cp.id === linkId)?.childId;
+          const rest = d.childPersons.filter((cp) => cp.id !== linkId);
+          return { ...d, childPersons: childId ? renumberContacts(rest, childId) : rest };
+        }),
       saveMedical: (alert, id) =>
         update((d) => ({
           ...d,
@@ -149,6 +167,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
+      fixClothing: (childId, clothing) =>
+        update((d) => {
+          // Instructors may only correct children in their own group today.
+          if (role === 'instructor' && me && !groupForInstructor(d, me).kids.some((c) => c.id === childId)) return d;
+          return {
+            ...d,
+            attendance: d.attendance.map((a) =>
+              a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY ? { ...a, ...clothing, clothingFixedBy: userId, clothingFixedAt: stamp() } : a,
+            ),
+            // A correction during a search has to reach patrol too.
+            emergencies: d.emergencies.map((e) => (e.childId === childId && e.status === 'open' ? { ...e, ...clothing } : e)),
+          };
+        }),
       checkIn: (childId, { jacket, pants, helmet }) =>
         update((d) => {
           const existing = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);
