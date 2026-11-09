@@ -2,7 +2,7 @@
   "$schema": "https://piezas.ai/schemas/piezas-manifest.schema.json",
   "schemaVersion": 1,
   "generatedBy": "piezas",
-  "appName": "sfu_venture_labs_2026",
+  "appName": "Peak Pals by Kestrel Kids",
   "apiBaseUrl": "https://api.piezas.ai",
   "contractVersion": "15",
   "contractFetchedAt": "2026-11-07T03:36:38.544Z",
@@ -117,7 +117,7 @@
   "deploy": {
     "requiredEnv": [],
     "optionalEnv": [],
-    "appId": "187c1c6f-8315-47d6-9b76-f848226537d8"
+    "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc"
   },
   "recipes": [],
   "notes": [
