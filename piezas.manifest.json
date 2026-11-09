@@ -117,7 +117,7 @@
   "deploy": {
     "requiredEnv": [],
     "optionalEnv": [],
-    "appId": "187c1c6f-8315-47d6-9b76-f848226537d8"
+    "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc"
   },
   "recipes": [],
   "notes": [
@@ -125,7 +125,7 @@
     "Run `npx piezas doctor` after AI-generated changes."
   ],
   "testApp": {
-    "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc",
+    "appId": "73ebd87d-bc6e-483f-ab31-99946838fb07",
     "appName": "sfu_venture_labs_2026 (test)"
   }
 }
