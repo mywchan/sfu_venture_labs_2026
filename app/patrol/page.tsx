@@ -5,6 +5,7 @@ import { Shell } from '@/components/Shell';
 import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, timeLabel, userName } from '@/lib/access';
 import { TODAY, type Emergency } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
+import styles from './patrol.module.css';
 
 export default function PatrolHome() {
   return (
@@ -15,38 +16,88 @@ export default function PatrolHome() {
 }
 
 function Patrol() {
-  const { data, markNoticeMailed } = useStore();
-  const open = data.emergencies.filter((e) => e.status === 'open');
+  const { data, now, markNoticeMailed } = useStore();
+  const open = data.emergencies.filter((e) => e.status === 'open')
+    .sort((a, b) => policeDeadline(a.lastSeenAt).getTime() - policeDeadline(b.lastSeenAt).getTime());
   const closed = data.emergencies.filter((e) => e.status === 'closed');
   const [openId, setOpenId] = useState<string | null>(null);
   const current = open.find((e) => e.id === openId) ?? (open.length === 1 ? open[0] : null);
 
   return (
     <>
+      <h1>Patrol response</h1>
+      <p className="small muted" data-testid="patrol-preview-note">
+        Preview only: actions are simulated in this tab. No real alerts are delivered and no calls are made to police.
+      </p>
       {open.length === 0 ? (
         <div className="card" data-testid="no-searches">
-          <h1>No open searches</h1>
-          <p className="muted">When an instructor or the desk reports a child missing, the alert appears here immediately. Children’s details are only available to patrol during a search.</p>
+          <h2>No open searches</h2>
+          <p className="muted">Reports made in this preview appear here. Children’s details are only shown during an open search.</p>
         </div>
       ) : (
-        <>
-          {open.length > 1 && (
-            <div className="row" style={{ marginBottom: 12 }}>
+        <div className={styles.dashboard} data-testid="patrol-dashboard">
+          <section className={styles.incidentList} aria-labelledby="active-incidents-heading" data-testid="active-incidents">
+            <div className={styles.listHeading}>
+              <h2 id="active-incidents-heading">Active incidents ({open.length})</h2>
+              <span className="small muted">Earliest escalation deadline first</span>
+            </div>
+            <div className={styles.incidentGrid}>
               {open.map((e) => {
-                const c = data.children.find((x) => x.id === e.childId)!;
+                const c = data.children.find((x) => x.id === e.childId);
+                const name = c ? fullName(c) : 'Child information unavailable';
+                const deadline = policeDeadline(e.lastSeenAt);
+                const minutesLeft = Math.ceil((deadline.getTime() - now.getTime()) / 60_000);
+                const overdue = deadline.getTime() <= now.getTime();
+                const urgent = minutesLeft <= 10;
+                const acks = data.acks.filter((a) => a.emergencyId === e.id);
+                const selected = current?.id === e.id;
                 return (
-                  <button key={e.id} type="button" className={current?.id === e.id ? 'primary' : ''} onClick={() => setOpenId(e.id)}>
-                    {fullName(c)}
-                  </button>
+                  <article key={e.id} className={`card ${styles.incidentCard} ${overdue ? styles.overdue : ''} ${selected ? styles.selected : ''}`}
+                    aria-label={`Incident for ${name}`} aria-current={selected ? 'true' : undefined} data-testid={`incident-card-${e.childId}`}>
+                    <div className="row between">
+                      <h3 className={styles.childName}>{name}</h3>
+                      {c?.bib != null && <span className="chip">Bib {c.bib}</span>}
+                    </div>
+                    <div className={styles.cardStatuses}>
+                      <span className={`chip ${overdue || urgent ? 'danger' : ''}`} data-testid="incident-urgency">
+                        {overdue ? 'Overdue · escalation action required' : urgent ? `Urgent · ${minutesLeft} min left` : `${minutesLeft} min to escalation`}
+                      </span>
+                      <span className={`chip ${acks.length ? 'ok' : 'warn'}`} data-testid="incident-ack-status">
+                        {acks.length ? `Acknowledged · ${acks.length} ${acks.length === 1 ? 'patroller' : 'patrollers'}` : 'Unacknowledged'}
+                      </span>
+                    </div>
+                    <dl className={styles.incidentFacts}>
+                      <div><dt>Last seen</dt><dd>{e.lastSeenPlace} · <time dateTime={e.lastSeenAt}>{timeLabel(e.lastSeenAt)}</time></dd></div>
+                      <div><dt>Reported by</dt><dd>{userName(data, e.reportedBy)}</dd></div>
+                      <div><dt>Escalation deadline</dt><dd><time dateTime={deadline.toISOString()}>{timeLabel(deadline.toISOString())}</time></dd></div>
+                    </dl>
+                    {acks.length > 0 && <p className="small muted" data-testid="incident-responders">
+                      Responding: {acks.map((a) => userName(data, a.patrollerId)).join(', ')}
+                    </p>}
+                    {selected ? (
+                      <span className={styles.currentIndicator} data-testid={`viewing-incident-${e.childId}`}>Currently viewing</span>
+                    ) : (
+                      <button type="button" aria-label={`View search for ${name}`}
+                        aria-controls={current ? 'patrol-incident-detail' : undefined}
+                        data-testid={`open-incident-${e.childId}`} onClick={() => setOpenId(e.id)}>
+                        View search
+                      </button>
+                    )}
+                  </article>
                 );
               })}
             </div>
+          </section>
+          {current ? <SearchScreen key={current.id} em={current} /> : (
+            <div className={`card ${styles.selectPrompt}`}>
+              <h2>Select an incident</h2>
+              <p className="muted">Choose View search to see emergency details and record your response.</p>
+            </div>
           )}
-          {current && <SearchScreen key={current.id} em={current} />}
-        </>
+        </div>
       )}
       {closed.length > 0 && (
-        <section className="card" data-testid="closed-searches">
+        <section className={`card ${styles.closedSearches}`} data-testid="closed-searches">
           <h2>Closed searches today</h2>
           <p className="small muted">Children’s details are no longer available once a search is closed.</p>
           <table>
@@ -104,14 +155,27 @@ function SearchScreen({ em }: { em: Emergency }) {
   const minsMissing = Math.max(0, Math.floor((now.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
 
   return (
-    <div data-testid="search-screen">
+    <div id="patrol-incident-detail" className={styles.detail} data-testid="search-screen">
       <div className="banner danger" style={{ fontSize: '1.1rem' }}>
         MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · missing {minsMissing} min
       </div>
 
-      <div className="grid2" style={{ alignItems: 'start' }}>
-        <section className="card">
-          <div className="row" style={{ alignItems: 'flex-start' }}>
+      <section className={`card ${styles.responseControls}`} aria-label="Patrol acknowledgement">
+        <div data-testid="acks">
+          <h2>Patrol acknowledgement</h2>
+          {acks.length === 0 ? <p className="muted">No patrollers have acknowledged yet.</p> : (
+            <ul className={styles.acknowledgements}>
+              {acks.map((a) => <li key={a.patrollerId}>{userName(data, a.patrollerId)} <span className="small muted">· {timeLabel(a.at)}</span></li>)}
+            </ul>
+          )}
+        </div>
+        {!iAcked && <button className="primary" type="button" onClick={() => acknowledge(em.id)} data-testid="acknowledge">I’m on it</button>}
+      </section>
+
+      <div className={styles.detailGrid}>
+        <section className="card" aria-label="Child identification">
+          <h2>Child identification</h2>
+          <div className={styles.identification}>
             <div
               aria-label={consent?.photoConsent ? 'Photo' : 'No photo consent'}
               style={{ width: 84, height: 100, borderRadius: 8, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: consent?.photoConsent ? '1.8rem' : '0.75rem', color: 'var(--ink-2)', textAlign: 'center', padding: 4 }}
@@ -135,6 +199,7 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
 
         <section className="card" data-testid="search-countdown">
+          <h2>Escalation</h2>
           <h3>Call police by {deadline.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</h3>
           <div className="big-number" style={{ color: minsLeft <= 10 ? 'var(--danger)' : undefined }}>
             {msLeft > 0 ? `${minsLeft} min left` : 'Call police now'}
@@ -158,7 +223,7 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
 
         <section className="card" data-testid="search-medical">
-          <h3>Medical</h3>
+          <h2>Medical alerts</h2>
           {alerts.length === 0 ? <p className="muted">No medical alerts.</p> : alerts.map((a) => (
             <div key={a.id} style={{ marginBottom: 10 }}>
               <div className={`alert-line ${a.severity}`}>{a.shortAlert}</div>
@@ -168,7 +233,7 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
 
         <section className="card" data-testid="search-contacts">
-          <h3>Emergency contacts</h3>
+          <h2>Emergency contacts</h2>
           {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
             <p key={link.id}>
               <strong>{link.contactOrder}. {person.name}</strong> ({link.relationship})<br />
@@ -180,29 +245,21 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
       </div>
 
-      <section className="card">
-        <div className="row between">
-          <div data-testid="acks">
-            <strong>Acknowledged:</strong>{' '}
-            {acks.length === 0 ? <span className="muted">no one yet</span> : acks.map((a) => `${userName(data, a.patrollerId)} (${timeLabel(a.at)})`).join(', ')}
-          </div>
-          {!iAcked && <button className="primary" type="button" onClick={() => acknowledge(em.id)} data-testid="acknowledge">I’m on it</button>}
-        </div>
-      </section>
-
-      <section className="card">
+      <section className="card" aria-label="Search resolution">
+        <h2>Resolve search</h2>
+        <p className="small muted">Record the outcome when the search is complete.</p>
         {!closing ? (
           <button type="button" onClick={() => setClosing(true)} data-testid="close-search">Close search</button>
         ) : (
           <form
-            className="row"
+            className={styles.closureForm}
             onSubmit={(e) => {
               e.preventDefault();
               closeSearch(em.id, outcome);
             }}
           >
             <label htmlFor="outcome" style={{ margin: 0 }}>Outcome</label>
-            <select id="outcome" style={{ width: 'auto' }} value={outcome} onChange={(e) => setOutcome(e.target.value)} data-testid="close-outcome">
+            <select id="outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} data-testid="close-outcome">
               <option>Found safe</option>
               <option>Found, needed first aid</option>
               <option>Handed over to police</option>
