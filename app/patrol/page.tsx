@@ -16,6 +16,7 @@ export default function PatrolHome() {
 
 function Patrol() {
   const { data, markNoticeMailed } = useStore();
+  const [closedError, setClosedError] = useState<string | null>(null);
   const open = data.emergencies.filter((e) => e.status === 'open');
   const closed = data.emergencies.filter((e) => e.status === 'closed');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -49,6 +50,7 @@ function Patrol() {
         <section className="card" data-testid="closed-searches">
           <h2>Closed searches today</h2>
           <p className="small muted">Children’s details are no longer available once a search is closed.</p>
+          {closedError && <div className="banner danger" data-testid="closed-error">{closedError}</div>}
           <table>
             <thead><tr><th>Child</th><th>Closed</th><th>Outcome</th><th>Notice to family</th></tr></thead>
             <tbody>
@@ -65,7 +67,7 @@ function Patrol() {
                       ) : e.noticeMailed ? (
                         'Mailed'
                       ) : (
-                        <button type="button" onClick={() => markNoticeMailed(e.id)}>To mail · mark done</button>
+                        <button type="button" onClick={() => markNoticeMailed(e.id).then(() => setClosedError(null), (err: Error) => setClosedError(err.message))}>To mail · mark done</button>
                       )}
                     </td>
                   </tr>
@@ -90,6 +92,21 @@ function SearchScreen({ em }: { em: Emergency }) {
   const iAcked = acks.some((a) => a.patrollerId === me!.id);
   const [closing, setClosing] = useState(false);
   const [outcome, setOutcome] = useState('Found safe');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Runs a save; the search stays on screen and shows the reason if it fails. */
+  const save = async (work: () => Promise<void>) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const logged = useRef(false);
   useEffect(() => {
@@ -108,6 +125,7 @@ function SearchScreen({ em }: { em: Emergency }) {
       <div className="banner danger" style={{ fontSize: '1.1rem' }}>
         MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · missing {minsMissing} min
       </div>
+      {error && <div className="banner danger" data-testid="search-save-error">{error}</div>}
 
       <div className="grid2" style={{ alignItems: 'start' }}>
         <section className="card">
@@ -141,14 +159,14 @@ function SearchScreen({ em }: { em: Emergency }) {
           </div>
           <p className="small muted">60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
           {!em.sharedWithPoliceAt ? (
-            <button type="button" onClick={() => shareWithPolice(em.id)} data-testid="share-police">Record: details shared with police</button>
+            <button type="button" disabled={saving} onClick={() => void save(() => shareWithPolice(em.id))} data-testid="share-police">Record: details shared with police</button>
           ) : (
             <div className="stack">
               <div className="banner warn" data-testid="police-shared">Shared with police at {timeLabel(em.sharedWithPoliceAt)}</div>
               {!em.noticeMailed ? (
                 <div className="row between card" style={{ margin: 0 }} data-testid="notice-todo">
                   <span>Mail a notice to the family (privacy law)</span>
-                  <button type="button" onClick={() => markNoticeMailed(em.id)}>Mark done</button>
+                  <button type="button" disabled={saving} onClick={() => void save(() => markNoticeMailed(em.id))}>Mark done</button>
                 </div>
               ) : (
                 <span className="chip ok">Notice mailed</span>
@@ -191,7 +209,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             <strong>Acknowledged:</strong>{' '}
             {acks.length === 0 ? <span className="muted">no one yet</span> : acks.map((a) => `${userName(data, a.patrollerId)} (${timeLabel(a.at)})`).join(', ')}
           </div>
-          {!iAcked && <button className="primary" type="button" onClick={() => acknowledge(em.id)} data-testid="acknowledge">I’m on it</button>}
+          {!iAcked && <button className="primary" type="button" disabled={saving} onClick={() => void save(() => acknowledge(em.id))} data-testid="acknowledge">I’m on it</button>}
         </div>
       </section>
 
@@ -203,7 +221,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             className="row"
             onSubmit={(e) => {
               e.preventDefault();
-              closeSearch(em.id, outcome);
+              void save(() => closeSearch(em.id, outcome));
             }}
           >
             <label htmlFor="outcome" style={{ margin: 0 }}>Outcome</label>
@@ -213,7 +231,7 @@ function SearchScreen({ em }: { em: Emergency }) {
               <option>Handed over to police</option>
               <option>False alarm</option>
             </select>
-            <button className="primary" type="submit" data-testid="close-confirm">Close search</button>
+            <button className="primary" type="submit" disabled={saving} data-testid="close-confirm">Close search</button>
             <button className="ghost" type="button" onClick={() => setClosing(false)}>Cancel</button>
           </form>
         )}

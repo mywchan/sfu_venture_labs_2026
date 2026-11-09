@@ -22,6 +22,7 @@ export type GuardianRow = {
 type Entity = Awaited<ReturnType<typeof setUp>>['person'];
 type Stored = Awaited<ReturnType<Entity['list']>>['data'][number];
 
+export const LAST_ADULT = 'Each child needs at least one adult on file. Add another adult before removing this one.';
 const MAX_ADULTS_PER_CHILD = 30;
 const PAGE_SIZE = 100;
 const PIEZAS_RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -108,16 +109,18 @@ const linkData = (r: GuardianRow, personId: string) => ({
 });
 
 /**
- * Saves a child's list of adults: new ones are created and changed ones updated.
- * The whole list is sent because changing one contact's position can renumber
- * the others. Only adults explicitly named in `removedLinkIds` are deleted, so
- * an adult another parent added a moment ago is never erased by a stale list.
+ * Saves the adults that changed: new ones are created and changed ones updated.
+ * Only what changed is sent, so one parent's save can't undo what another parent
+ * saved seconds earlier. Only adults named in `removedLinkIds` are deleted.
+ * Returns null, saving nothing, if that would leave the child with no adults.
  */
-export async function saveGuardians(childId: string, rows: GuardianRow[], removedLinkIds: string[]): Promise<GuardianRow[]> {
+export async function saveGuardians(childId: string, rows: GuardianRow[], removedLinkIds: string[]): Promise<GuardianRow[] | null> {
   const { person, childPerson } = await records();
   const existing = await listAll(childPerson, { childId });
   const existingById = new Map(existing.map((l) => [l.id, l]));
   const removing = new Set(removedLinkIds);
+  const adding = rows.filter((r) => !existingById.has(r.linkId) && !PIEZAS_RECORD_ID.test(r.linkId)).length;
+  if (existing.filter((l) => !removing.has(l.id)).length + adding === 0) return null;
 
   for (const row of rows) {
     const link = existingById.get(row.linkId);
@@ -151,7 +154,6 @@ export async function saveGuardians(childId: string, rows: GuardianRow[], remove
 /** Checks what the browser sent. Returns cleaned rows, or a message saying what's wrong. */
 export function validateGuardians(childId: string, input: unknown): { rows: GuardianRow[] } | { problem: string } {
   if (!Array.isArray(input) || input.length > MAX_ADULTS_PER_CHILD) return { problem: 'The list of adults is not valid.' };
-  if (input.length === 0) return { problem: 'Each child needs at least one adult on file. Add another adult before removing this one.' };
   const rows: GuardianRow[] = [];
   const positions = new Set<number>();
   for (const raw of input) {

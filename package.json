@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "data:guardians": "node --env-file=.env scripts/show-guardians.mjs"
+    "data:guardians": "node --env-file=.env scripts/show-guardians.mjs",
+    "data:today": "node --env-file=.env scripts/today.mjs",
+    "data:reset-today": "node --env-file=.env scripts/today.mjs reset"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0",

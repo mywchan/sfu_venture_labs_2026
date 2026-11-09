@@ -1,12 +1,11 @@
 'use client';
 
-// The app's working state. Adults linked to a child (guardians, emergency
-// contacts, pickup adults) are saved in Peak Pals through /api/guardians.
-// Everything else is still preview-only: it lives in this browser tab's memory
-// and resets on reload, until each piece is connected the same way.
+// The app's working state. Saved in Peak Pals: adults linked to a child (through
+// /api/guardians), and check-ins, pickups and the emergency log (through
+// /api/today). Everything else is still preview-only: it lives in this browser
+// tab's memory and resets on reload, until each piece is connected the same way.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { groupForInstructor } from './access';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   seedData,
   TODAY,
@@ -15,8 +14,11 @@ import {
   type ChildPerson,
   type ConsentForm,
   type Data,
+  type Emergency,
   type MedicalAlert,
+  type PatrolAck,
   type Person,
+  type PickupRefusal,
   type Role,
   type User,
 } from './seed/data';
@@ -37,6 +39,7 @@ type Store = {
   // parent
   guardianLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for adults?
   sessionChecked: boolean; // false until we've looked up who is signed in
+  liveLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for today's records?
   savePerson: (childId: string, person: Person, link: Omit<ChildPerson, 'id' | 'childId' | 'personId'>, linkId?: string) => Promise<void>;
   removeLink: (linkId: string) => Promise<void>;
   saveMedical: (alert: Omit<MedicalAlert, 'id'>, id?: string) => void;
@@ -45,17 +48,17 @@ type Store = {
   signConsent: (form: ConsentForm) => void;
   // instructor
   logAccess: (what: string, childId: string) => void;
-  fixClothing: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
+  fixClothing: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => Promise<void>;
   // desk
-  checkIn: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => void;
-  release: (childId: string, personId: string) => void;
-  refusePickup: (childId: string, nameGiven: string) => void;
+  checkIn: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => Promise<void>;
+  release: (childId: string, personId: string) => Promise<void>;
+  refusePickup: (childId: string, nameGiven: string) => Promise<void>;
   // missing child
-  reportMissing: (childId: string, lastSeenPlace: string, lastSeenTime: string) => string;
-  acknowledge: (emergencyId: string) => void;
-  shareWithPolice: (emergencyId: string) => void;
-  markNoticeMailed: (emergencyId: string) => void;
-  closeSearch: (emergencyId: string, outcome: string) => void;
+  reportMissing: (childId: string, lastSeenPlace: string, lastSeenTime: string) => Promise<void>;
+  acknowledge: (emergencyId: string) => Promise<void>;
+  shareWithPolice: (emergencyId: string) => Promise<void>;
+  markNoticeMailed: (emergencyId: string) => Promise<void>;
+  closeSearch: (emergencyId: string, outcome: string) => Promise<void>;
   // admin
   updateChild: (childId: string, patch: Partial<Data['children'][number]>) => void;
   addGroup: (name: string, level: number, instructorId: string) => void;
@@ -109,6 +112,33 @@ function applyGuardians(d: Data, rows: GuardianRow[], childIds: Set<string>): Da
   };
 }
 
+// What the server sends back for today (see lib/server/today.ts).
+type TodayRows = { attendance: Attendance[]; refusals: PickupRefusal[]; emergencies: Emergency[]; acks: PatrolAck[] };
+
+/** Puts today's saved records in place. A saved check-in replaces the made-up one. */
+function applyToday(d: Data, t: TodayRows): Data {
+  const saved = new Set(t.attendance.map((a) => a.childId));
+  return {
+    ...d,
+    attendance: [...d.attendance.filter((a) => !(a.lessonDayId === TODAY_LESSON_DAY && saved.has(a.childId))), ...t.attendance],
+    refusals: t.refusals,
+    emergencies: t.emergencies,
+    acks: t.acks,
+  };
+}
+
+const PIEZAS_RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One child's adults, in the shape the server saves. */
+function guardianRows(d: Data, childId: string) {
+  return d.childPersons
+    .filter((cp) => cp.childId === childId)
+    .map((cp) => {
+      const p = d.persons.find((x) => x.id === cp.personId);
+      return { linkId: cp.id, name: p?.name ?? '', phone: p?.phone ?? '', email: p?.email ?? '', relationship: cp.relationship, contactOrder: cp.contactOrder, canPickUp: cp.canPickUp };
+    });
+}
+
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -118,6 +148,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date(CLOCK_START));
   const [guardianLink, setGuardianLink] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [liveLink, setLiveLink] = useState<'checking' | 'connected' | 'offline'>('checking');
+  // Counts saves, so a background refresh that started before a save can't overwrite it.
+  const saves = useRef(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date(CLOCK_START + (Date.now() - started))), 1000);
@@ -143,6 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }, [started]);
   const update = useCallback((fn: (d: Data) => Data) => setData((d) => fn(d)), []);
+  const openSearches = data.emergencies.filter((e) => e.status === 'open').map((e) => e.id).join();
 
   // Adults come from Peak Pals: loaded on sign-in, then re-checked every 10
   // seconds so a change made on another device shows up here.
@@ -167,16 +201,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       stopped = true;
       clearInterval(t);
     };
-  }, [meId]);
+    // A search opening or closing changes which adults patrol may see, so re-check at once.
+  }, [meId, openSearches]);
 
-  /** Sends a child's full list to Peak Pals. The screen only changes once it's saved. */
-  const pushGuardians = useCallback(async (next: Data, childId: string, asUserId: string, removedLinkIds: string[] = []) => {
-    const guardians = next.childPersons
-      .filter((cp) => cp.childId === childId)
-      .map((cp) => {
-        const p = next.persons.find((x) => x.id === cp.personId);
-        return { linkId: cp.id, name: p?.name ?? '', phone: p?.phone ?? '', email: p?.email ?? '', relationship: cp.relationship, contactOrder: cp.contactOrder, canPickUp: cp.canPickUp };
-      });
+  // Today's records come from Peak Pals: staff re-check every 5 seconds so a
+  // missing-child alert reaches patrol quickly; parents less often.
+  const staff = data.users.find((u) => u.id === meId)?.role !== 'parent';
+  useEffect(() => {
+    if (!meId) return;
+    let stopped = false;
+    const load = async () => {
+      const startedAt = saves.current;
+      try {
+        const res = await fetch(`/api/today?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(String(res.status));
+        const { today } = (await res.json()) as { today: TodayRows };
+        if (stopped || saves.current !== startedAt) return;
+        setData((d) => applyToday(d, today));
+        setLiveLink('connected');
+      } catch {
+        if (!stopped) setLiveLink('offline');
+      }
+    };
+    void load();
+    const t = setInterval(load, staff ? 5_000 : 30_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId, staff]);
+
+  /** Sends one action to Peak Pals. The screen only changes once it's saved. */
+  const sendToday = useCallback(async (asUserId: string, action: Record<string, unknown>) => {
+    saves.current += 1;
+    try {
+      let res: Response;
+      try {
+        res = await fetch('/api/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ as: asUserId, ...action }) });
+      } catch {
+        setLiveLink('offline');
+        throw new Error('Couldn’t reach Peak Pals, so that was not saved.');
+      }
+      const body = (await res.json().catch(() => ({}))) as { today?: TodayRows; error?: string };
+      if (!res.ok || !body.today) throw new Error(body.error ?? 'That didn’t save. Please try again.');
+      const saved = body.today;
+      setData((d) => applyToday(d, saved));
+      setLiveLink('connected');
+    } finally {
+      saves.current += 1;
+    }
+  }, []);
+
+  /** Sends only the adults that changed, so this save can't undo another parent's. */
+  const pushGuardians = useCallback(async (before: Data, next: Data, childId: string, asUserId: string, removedLinkIds: string[] = []) => {
+    const previous = new Map(guardianRows(before, childId).map((r) => [r.linkId, JSON.stringify(r)]));
+    // Adults still only on the made-up list have to go up too, or they'd vanish.
+    const guardians = guardianRows(next, childId).filter((r) => !PIEZAS_RECORD_ID.test(r.linkId) || previous.get(r.linkId) !== JSON.stringify(r));
     const res = await fetch('/api/guardians', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -220,6 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       guardianLink,
       sessionChecked,
+      liveLink,
       savePerson: async (childId, person, link, linkId) => {
         const persons = data.persons.some((p) => p.id === person.id)
           ? data.persons.map((p) => (p.id === person.id ? person : p))
@@ -227,13 +308,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const rowId = linkId ?? newId('cp');
         const row: ChildPerson = { id: rowId, childId, personId: person.id, ...link };
         const links = linkId ? data.childPersons.map((cp) => (cp.id === linkId ? row : cp)) : [...data.childPersons, row];
-        await pushGuardians({ ...data, persons, childPersons: renumberContacts(links, childId, rowId, link.contactOrder) }, childId, userId);
+        await pushGuardians(data, { ...data, persons, childPersons: renumberContacts(links, childId, rowId, link.contactOrder) }, childId, userId);
       },
       removeLink: async (linkId) => {
         const childId = data.childPersons.find((cp) => cp.id === linkId)?.childId;
         if (!childId) return;
         const rest = data.childPersons.filter((cp) => cp.id !== linkId);
-        await pushGuardians({ ...data, childPersons: renumberContacts(rest, childId) }, childId, userId, [linkId]);
+        await pushGuardians(data, { ...data, childPersons: renumberContacts(rest, childId) }, childId, userId, [linkId]);
       },
       saveMedical: (alert, id) =>
         update((d) => ({
@@ -246,96 +327,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
-      fixClothing: (childId, clothing) =>
-        update((d) => {
-          // Instructors may only correct children in their own group today.
-          if (role === 'instructor' && me && !groupForInstructor(d, me).kids.some((c) => c.id === childId)) return d;
-          return {
-            ...d,
-            attendance: d.attendance.map((a) =>
-              a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY ? { ...a, ...clothing, clothingFixedBy: userId, clothingFixedAt: stamp() } : a,
-            ),
-            // A correction during a search has to reach patrol too.
-            emergencies: d.emergencies.map((e) => (e.childId === childId && e.status === 'open' ? { ...e, ...clothing } : e)),
-          };
-        }),
-      checkIn: (childId, { jacket, pants, helmet }) =>
-        update((d) => {
-          const existing = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);
-          const row: Attendance = {
-            id: existing?.id ?? newId('a'),
-            childId,
-            lessonDayId: TODAY_LESSON_DAY,
-            checkInAt: stamp(),
-            checkedInBy: userId,
-            jacket,
-            pants,
-            helmet,
-            pickupAt: null,
-            pickedUpBy: null,
-            releasedBy: null,
-          };
-          return { ...d, attendance: [...d.attendance.filter((a) => a.id !== row.id), row] };
-        }),
-      release: (childId, personId) =>
-        update((d) => ({
-          ...d,
-          attendance: d.attendance.map((a) =>
-            a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY ? { ...a, pickupAt: stamp(), pickedUpBy: personId, releasedBy: userId } : a,
-          ),
-        })),
-      refusePickup: (childId, nameGiven) =>
-        update((d) => ({
-          ...d,
-          refusals: [{ id: newId('rf'), childId, lessonDayId: TODAY_LESSON_DAY, nameGiven, at: stamp(), staffId: userId }, ...d.refusals],
-        })),
-      reportMissing: (childId, lastSeenPlace, lastSeenTime) => {
-        const id = newId('em');
-        update((d) => {
-          const att = d.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY);
-          return {
-            ...d,
-            emergencies: [
-              {
-                id,
-                childId,
-                reportedBy: userId,
-                lastSeenPlace,
-                lastSeenAt: `${TODAY}T${lastSeenTime}:00`,
-                jacket: att?.jacket ?? 'Not recorded',
-                pants: att?.pants ?? 'Not recorded',
-                helmet: att?.helmet ?? 'Not recorded',
-                status: 'open',
-                sharedWithPoliceAt: null,
-                noticeMailed: false,
-                closedAt: null,
-                outcome: null,
-              },
-              ...d.emergencies,
-            ],
-          };
-        });
-        return id;
+      fixClothing: (childId, clothing) => sendToday(userId, { action: 'fixClothing', childId, ...clothing, at: stamp() }),
+      checkIn: (childId, clothing) => sendToday(userId, { action: 'checkIn', childId, ...clothing, at: stamp() }),
+      release: (childId, personId) => sendToday(userId, { action: 'release', childId, personId, at: stamp() }),
+      refusePickup: (childId, nameGiven) => sendToday(userId, { action: 'refusePickup', childId, nameGiven, at: stamp() }),
+      reportMissing: (childId, lastSeenPlace, lastSeenTime) => sendToday(userId, { action: 'reportMissing', childId, lastSeenPlace, lastSeenTime, at: stamp() }),
+      acknowledge: (emergencyId) => sendToday(userId, { action: 'acknowledge', emergencyId, at: stamp() }),
+      shareWithPolice: async (emergencyId) => {
+        await sendToday(userId, { action: 'shareWithPolice', emergencyId, at: stamp() });
+        const childId = data.emergencies.find((e) => e.id === emergencyId)?.childId;
+        if (childId) update((d) => record(d, 'Shared details with police', childId));
       },
-      acknowledge: (emergencyId) =>
-        update((d) =>
-          d.acks.some((a) => a.emergencyId === emergencyId && a.patrollerId === userId)
-            ? d
-            : { ...d, acks: [...d.acks, { emergencyId, patrollerId: userId, at: stamp() }] },
-        ),
-      shareWithPolice: (emergencyId) =>
-        update((d) => {
-          const em = d.emergencies.find((e) => e.id === emergencyId);
-          const next = { ...d, emergencies: d.emergencies.map((e) => (e.id === emergencyId ? { ...e, sharedWithPoliceAt: stamp() } : e)) };
-          return em ? record(next, 'Shared details with police', em.childId) : next;
-        }),
-      markNoticeMailed: (emergencyId) =>
-        update((d) => ({ ...d, emergencies: d.emergencies.map((e) => (e.id === emergencyId ? { ...e, noticeMailed: true } : e)) })),
-      closeSearch: (emergencyId, outcome) =>
-        update((d) => ({
-          ...d,
-          emergencies: d.emergencies.map((e) => (e.id === emergencyId ? { ...e, status: 'closed', closedAt: stamp(), outcome } : e)),
-        })),
+      markNoticeMailed: (emergencyId) => sendToday(userId, { action: 'markNoticeMailed', emergencyId, at: stamp() }),
+      closeSearch: (emergencyId, outcome) => sendToday(userId, { action: 'closeSearch', emergencyId, outcome, at: stamp() }),
       updateChild: (childId, patch) =>
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)) })),
       addGroup: (name, level, instructorId) =>
@@ -362,7 +366,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update, guardianLink, sessionChecked, pushGuardians]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, pushGuardians, sendToday]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

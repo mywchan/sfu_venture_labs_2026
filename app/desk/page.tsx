@@ -115,6 +115,21 @@ function ChildPanel({ child }: { child: Child }) {
   const [onList, setOnList] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const search = openSearchFor(data, child.id);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Runs a save; the panel stays put and shows the reason if it fails. */
+  const save = async (work: () => Promise<void>, ifFailed = '') => {
+    setSaving(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(`${ifFailed}${err instanceof Error ? err.message : 'That didn’t save.'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="card" data-testid="desk-child-panel">
@@ -122,13 +137,14 @@ function ChildPanel({ child }: { child: Child }) {
       <p className="muted small">Bib {child.bib} · Level {child.level} · {group ? `${group.name}, ${userName(data, group.instructorId)}` : 'No group yet'}</p>
 
       {search && <div className="banner danger">Ski patrol is searching for {child.firstName}.</div>}
+      {error && <div className="banner danger" data-testid="desk-save-error">{error}</div>}
 
       {!a?.checkInAt && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!clothingDone) return;
-            checkIn(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
+            if (!clothingDone || saving) return;
+            void save(() => checkIn(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() }));
           }}
           data-testid="checkin-form"
         >
@@ -137,7 +153,7 @@ function ChildPanel({ child }: { child: Child }) {
           <ColourPicker id="jacket" label="Jacket colour" value={jacket} onChange={setJacket} testId="checkin-jacket" />
           <ColourPicker id="pants" label="Pants colour" value={pants} onChange={setPants} testId="checkin-pants" />
           <ColourPicker id="helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="checkin-helmet" />
-          <button className="primary big" type="submit" disabled={!clothingDone} data-testid="checkin-submit">Check in {child.firstName}</button>
+          <button className="primary big" type="submit" disabled={!clothingDone || saving} data-testid="checkin-submit">{saving ? 'Saving…' : `Check in ${child.firstName}`}</button>
         </form>
       )}
 
@@ -150,7 +166,7 @@ function ChildPanel({ child }: { child: Child }) {
 
       {a?.pickupAt && (
         <div className="banner ok" data-testid="pickup-status">
-          Went home at {timeLabel(a.pickupAt)} with {data.persons.find((p) => p.id === a.pickedUpBy)?.name}, released by {userName(data, a.releasedBy)}
+          Went home at {timeLabel(a.pickupAt)} with {a.pickedUpName ?? data.persons.find((p) => p.id === a.pickedUpBy)?.name}, released by {userName(data, a.releasedBy)}
         </div>
       )}
 
@@ -165,7 +181,7 @@ function ChildPanel({ child }: { child: Child }) {
           <p className="small muted">Ask for photo ID if you don’t recognize the adult.</p>
           {refused && (
             <div className="banner danger" data-testid="pickup-refused">
-              {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. The attempt has been recorded. Call a parent below.
+              {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. Call a parent below.
             </div>
           )}
           {onList && (
@@ -175,7 +191,7 @@ function ChildPanel({ child }: { child: Child }) {
           )}
           <div className="stack">
             {adults.filter((x) => x.link.canPickUp).map(({ person, link }) => (
-              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} onClick={() => release(child.id, person.id)} data-testid={`release-to-${person.name}`}>
+              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={() => void save(() => release(child.id, person.id))} data-testid={`release-to-${person.name}`}>
                 <span>Release to <strong>{person.name}</strong> <span className="muted small">({link.relationship})</span></span>
                 <span className="small muted">{person.phone}</span>
               </button>
@@ -196,7 +212,9 @@ function ChildPanel({ child }: { child: Child }) {
                   setOnList(approved.person.name);
                   setRefused(null);
                 } else {
-                  refusePickup(child.id, otherName.trim());
+                  // The warning shows straight away; only the record of it waits for the save.
+                  const nameGiven = otherName.trim();
+                  void save(() => refusePickup(child.id, nameGiven), 'The warning stands, but this attempt wasn’t recorded. ');
                   setRefused(otherName.trim());
                   setOnList(null);
                 }

@@ -63,6 +63,7 @@ export type Attendance = {
   clothingFixedAt?: string | null;
   pickupAt: string | null;
   pickedUpBy: string | null; // person id
+  pickedUpName?: string | null; // their name at the time, kept even if they're later removed
   releasedBy: string | null; // user id
 };
 

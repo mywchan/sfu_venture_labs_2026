@@ -86,7 +86,7 @@ function LessonsTab({ childId }: { childId: string }) {
         <dt>Checked in</dt>
         <dd data-testid="lesson-checkin">{att?.checkInAt ? timeLabel(att.checkInAt) : 'Not yet'}</dd>
         <dt>Picked up</dt>
-        <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
+        <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${att.pickedUpName ?? pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
       </dl>
       <h3 style={{ marginTop: 16 }}>Lesson days</h3>
       <ul className="small">

@@ -1,15 +1,15 @@
 {
   "version": 1,
   "kind": "quality-scan",
-  "scanId": "412c7422e5d9",
-  "cycle": "32c2e96c8750",
-  "round": 3,
-  "nonce": "qs-191ff55cd5318978af",
-  "packetHash": "8629ef3e2d9de50b4e55119787b338c3a085bf5e74591ffb7812a201e24cb357",
-  "sourceFingerprint": "2dd7b6e1614c0b452f2047a8e5a66fd7091893d8a8b7453efd11ab2d17057a50",
+  "scanId": "b16fa8f95f46",
+  "cycle": "8494bf3a3636",
+  "round": 1,
+  "nonce": "qs-56ac4f56b7c408971f",
+  "packetHash": "ea1c6be66ac8216e89d3d053261e695cae4deb5dd0c1accb3cb2547b2c30aac3",
+  "sourceFingerprint": "5dd3ae39f90e3cedd55bd3e485a5bf819d87c5b78ed3822d7ee620f4e226134c",
   "specFingerprint": "3bb17bcc5bc3007b158261e9bd6124592ab68410f5d5c4d3e4b8a6c1995232a3",
-  "ranAt": "2026-11-09T00:38:06.355Z",
-  "validUntil": "2026-11-10T00:38:06.355Z",
+  "ranAt": "2026-11-09T03:49:21.940Z",
+  "validUntil": "2026-11-10T03:49:21.940Z",
   "findings": [
     {
       "n": 1,
@@ -23,46 +23,46 @@
     {
       "n": 2,
       "severity": "high",
-      "plain": "When someone reports a child missing, only that one browser window knows about it, so no patroller is alerted even though the reporter is told \"Ski patrol has been alerted.\"",
-      "file": "lib/store.tsx",
-      "previous": 2,
-      "key": "3c689061dd21c2577f4a3cda",
+      "plain": "On the live site nothing that is meant to be shared can be saved: check-ins, pickups, contacts and missing-child reports all fail, and an instructor reporting a missing child is told patrol has not been alerted, because saving only works on the builder's own computer until real sign-in exists.",
+      "file": "lib/server/preview-caller.ts",
+      "previous": 6,
+      "key": "f1be4ab8a4d1a330aad6e31a",
       "status": "open"
     },
     {
       "n": 3,
       "severity": "high",
-      "plain": "A parent's new allergy, a signed consent form, a check-in, a clothing change, a pickup, a refused pickup, or the administrator's groups and spreadsheet upload never reach anyone else's screen and are lost on reload, so staff can act on old information.",
-      "file": "lib/store.tsx",
-      "previous": 3,
-      "key": "9964f33c79e2181a04595805",
+      "plain": "A patroller only finds out about a missing child if they already have the patrol screen open and are looking at it, so anyone with the app closed or their phone in a pocket gets no alert, sound or message.",
+      "file": "app/patrol/page.tsx",
+      "previous": 2,
+      "key": "d338b4edcd849d1c4764c6dd",
       "status": "open"
     },
     {
       "n": 4,
       "severity": "high",
-      "plain": "Every family's medical details and contacts are sent to the browser of every signed-in person, and only the screen layout hides them, so a parent, the desk or patrol with no open search could still get at them.",
+      "plain": "Every family's medical details and contacts are still sent to the browser of every signed-in person, and only the screen layout hides them, so a parent, the desk, or patrol with no open search could still get at them.",
       "file": "lib/store.tsx",
       "previous": 4,
-      "key": "3d6ad699509e58b2eee373a9",
+      "key": "4b9fe12ae9608e1277a03daf",
       "status": "open"
     },
     {
       "n": 5,
       "severity": "high",
-      "plain": "Patrol is still given every family's saved contacts and pickup adults at all times, even when no search is open, instead of only during a search.",
-      "file": "app/api/guardians/route.ts",
-      "previous": 5,
-      "key": "74a81b87cbd6fedba27d5854",
+      "plain": "A parent's new allergy, a signed consent form, and the administrator's child edits, groups and spreadsheet upload still never reach anyone else's screen and are lost on reload, so an instructor can miss an allergy a parent just entered.",
+      "file": "lib/store.tsx",
+      "previous": 3,
+      "key": "bdca2c98286de3cfd7ee60f8",
       "status": "open"
     },
     {
       "n": 6,
       "severity": "high",
-      "plain": "On the live site parents cannot save or see saved contacts and pickup adults at all, and the desk and patrol would always see a \"can't reach\" warning, because that saving only works on the builder's own computer until real sign-in exists.",
-      "file": "app/api/guardians/route.ts",
-      "previous": 6,
-      "key": "dcb44aab3ea3db903988d33b",
+      "plain": "The record of who viewed medical details or opened a child during a search stays only in that person's own browser window, so the administrator never sees it and it disappears on reload.",
+      "file": "lib/store.tsx",
+      "previous": 13,
+      "key": "ba55c428fade8a517d613cdc",
       "status": "open"
     },
     {
@@ -95,10 +95,10 @@
     {
       "n": 10,
       "severity": "high",
-      "plain": "The app runs on a made-up clock that always says Saturday, December 12 and restarts at 1:35 p.m., so the police countdown, consent signing dates and the 4 p.m. delete would be wrong on a real day.",
+      "plain": "The app still runs on a made-up clock that always says Saturday, December 12 and restarts at 1:35 p.m. each time someone opens it, so check-in times, the police countdown, consent signing dates and the 4 p.m. delete would be wrong on a real day and can differ from one person's phone to another's.",
       "file": "lib/store.tsx",
       "previous": 10,
-      "key": "b62abb6d3ebbfe827be9ab98",
+      "key": "7687b1c3e73a3767e3d01da2",
       "status": "open"
     },
     {
@@ -121,45 +121,34 @@
     },
     {
       "n": 13,
-      "severity": "high",
-      "plain": "The record of who viewed medical details or opened a child during a search stays only in that person's own browser window, so the administrator never sees it and it disappears on reload.",
-      "file": "lib/store.tsx",
-      "previous": 13,
-      "key": "ba55c428fade8a517d613cdc",
+      "severity": "medium",
+      "plain": "A child added from the store spreadsheet shows at the desk but cannot be checked in, and a child the administrator moves into a group cannot have clothing corrected or be reported missing by that group's instructor, because saving only knows the original children and groups.",
+      "file": "lib/server/today.ts",
+      "key": "ac47a3babc839f1c270c0c23",
       "status": "open"
     },
     {
       "n": 14,
       "severity": "medium",
-      "plain": "None of the 27 agreed checks has been written and no test run exists, so nothing the owner approved has been proven to work, and the test copy has no sample families to check against.",
+      "plain": "None of the 27 agreed checks has been written and no test run exists, so nothing the owner approved has been proven to work.",
       "file": "tests/scenarios",
       "previous": 14,
-      "key": "aa56ecc9b22c74985cebdc77",
+      "key": "e21ef84f4ec96d374bd5d7c0",
       "status": "open"
     },
     {
       "n": 15,
       "severity": "medium",
-      "plain": "If one parent turns off pickup permission for an adult and the other parent saves any change a few seconds later, that adult goes back to being approved for pickup with no warning to anyone.",
-      "file": "lib/server/guardians.ts",
-      "previous": 16,
-      "key": "4c5db0e46c5b0b0fa645241c",
-      "status": "open"
-    },
-    {
-      "n": 16,
-      "severity": "medium",
       "plain": "No child photo can be added anywhere, so patrol never sees a real photo during a search even when the parent gave photo consent, only the child's initials.",
       "file": "app/patrol/page.tsx",
-      "previous": 17,
+      "previous": 16,
       "key": "92bbd0e77b00385dad204ff4",
       "status": "open"
     }
   ],
   "fixedFromPrevious": {
-    "fixed": 1,
-    "of": 17
+    "fixed": 2,
+    "of": 16
   },
-  "status": "stopped",
-  "stoppedAfterRounds": 3
+  "status": "open"
 }

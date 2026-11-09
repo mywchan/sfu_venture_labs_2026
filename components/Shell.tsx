@@ -23,7 +23,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 /** Page frame for a signed-in role. Anyone of another role is sent to their own screens. */
 export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean; children: ReactNode }) {
-  const { me, now, signOut, sessionChecked } = useStore();
+  const { me, now, signOut, sessionChecked, liveLink } = useStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -56,7 +56,14 @@ export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean
           Sign out
         </button>
       </header>
-      <main className={narrow ? 'narrow' : undefined}>{children}</main>
+      <main className={narrow ? 'narrow' : undefined}>
+        {role !== 'parent' && liveLink === 'offline' && (
+          <div className="banner danger" data-testid="live-stale">
+            Can’t reach Peak Pals, so this screen may be out of date and new entries may not save. Use your radio for anything urgent.
+          </div>
+        )}
+        {children}
+      </main>
     </>
   );
 }

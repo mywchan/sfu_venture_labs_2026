@@ -13,6 +13,8 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
   const [place, setPlace] = useState('');
   const [time, setTime] = useState(`${hh}:${mm}`);
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const already = openSearchFor(data, child.id);
 
   return (
@@ -26,11 +28,19 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
           </>
         ) : (
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              if (!place.trim()) return;
-              reportMissing(child.id, place.trim(), time);
-              setDone(true);
+              if (!place.trim() || sending) return;
+              setSending(true);
+              setError(null);
+              try {
+                await reportMissing(child.id, place.trim(), time);
+                setDone(true); // only say patrol was alerted once it's really saved
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'That didn’t save.');
+              } finally {
+                setSending(false);
+              }
             }}
           >
             <h2 id="rm-title">Report {fullName(child)} missing</h2>
@@ -43,7 +53,12 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
               <label htmlFor="rm-time">When?</label>
               <input id="rm-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} data-testid="report-missing-time" />
             </div>
-            <button className="big danger" type="submit" disabled={!place.trim()} data-testid="report-missing-send">Alert ski patrol now</button>
+            {error && (
+              <div className="banner danger" data-testid="report-missing-error">
+                Ski patrol has NOT been alerted. Radio patrol now, then try again. ({error})
+              </div>
+            )}
+            <button className="big danger" type="submit" disabled={!place.trim() || sending} data-testid="report-missing-send">{sending ? 'Alerting…' : 'Alert ski patrol now'}</button>
             <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
           </form>
         )}
