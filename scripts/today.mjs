@@ -10,8 +10,11 @@ const t = { type: 'text' };
 const required = { type: 'text', required: true };
 
 // Keep these fields in step with lib/server/today.ts.
-const { kk_attendance: attendance, kk_pickup_refusal: refusal, kk_emergency: emergency, kk_patrol_ack: ack } = await piezas.defineEntities(
+const { kk_attendance: attendance, kk_pickup_refusal: refusal, kk_emergency: emergency, kk_patrol_ack: ack, kk_notification: notification } = await piezas.defineEntities(
   {
+    kk_notification: {
+      fields: { recipientId: required, kind: required, message: required, href: required, actionLabel: required, dedupeKey: required, urgent: { type: 'boolean' }, refId: t, readAt: t },
+    },
     kk_attendance: {
       fields: { childId: required, lessonDayId: required, checkInAt: t, checkedInBy: t, jacket: t, pants: t, helmet: t, clothingFixedBy: t, clothingFixedAt: t, pickupAt: t, pickedUpBy: t, pickedUpName: t, releasedBy: t },
     },
@@ -38,14 +41,15 @@ async function listAll(entity, filter) {
 
 const day = { lessonDayId: LESSON_DAY };
 const [attendanceRows, refusalRows, emergencyRows, ackRows] = await Promise.all([listAll(attendance, day), listAll(refusal, day), listAll(emergency, day), listAll(ack, {})]);
+const notificationRows = await listAll(notification, {});
 const emergencyIds = new Set(emergencyRows.map((e) => e.id));
 const dayAcks = ackRows.filter((a) => emergencyIds.has(a.data.emergencyId));
 
 if (reset) {
-  for (const [entity, rows] of [[attendance, attendanceRows], [refusal, refusalRows], [ack, dayAcks], [emergency, emergencyRows]]) {
+  for (const [entity, rows] of [[attendance, attendanceRows], [refusal, refusalRows], [ack, dayAcks], [emergency, emergencyRows], [notification, notificationRows]]) {
     for (const row of rows) await entity.delete(row.id);
   }
-  console.log(`\nCleared the preview day: ${attendanceRows.length} check-ins, ${refusalRows.length} refused pickups, ${emergencyRows.length} searches, ${dayAcks.length} acknowledgements.\n`);
+  console.log(`\nCleared the preview day: ${attendanceRows.length} check-ins, ${refusalRows.length} refused pickups, ${emergencyRows.length} searches, ${dayAcks.length} acknowledgements, ${notificationRows.length} notifications.\n`);
   process.exit(0);
 }
 
@@ -58,5 +62,9 @@ if (refusalRows.length) console.table(refusalRows.map(({ data: d }) => ({ child:
 console.log(`\nEmergency log saved in Piezas: ${emergencyRows.length}`);
 if (emergencyRows.length) {
   console.table(emergencyRows.map((e) => ({ child: e.data.childId, status: e.data.status, 'reported by': e.data.reportedBy, 'last seen': e.data.lastSeenPlace, at: e.data.lastSeenAt.slice(11, 16), 'on it': dayAcks.filter((a) => a.data.emergencyId === e.id).map((a) => a.data.patrollerId).join(', '), outcome: e.data.outcome ?? '', saved: e.updatedAt })));
+}
+console.log(`\nNotifications saved in Piezas: ${notificationRows.length}`);
+if (notificationRows.length) {
+  console.table(notificationRows.map((n) => ({ to: n.data.recipientId, kind: n.data.kind, message: n.data.message.slice(0, 70), read: n.data.readAt ? 'yes' : 'no', sent: n.createdAt })));
 }
 console.log('');
