@@ -8,7 +8,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   seedData,
-  TODAY,
   TODAY_LESSON_DAY,
   type AppNotification,
   type Attendance,
@@ -23,10 +22,6 @@ import {
   type Role,
   type User,
 } from './seed/data';
-
-// Demo clock: starts at 1:35 p.m. on the first Saturday and runs in real time,
-// so the police-call countdown has something sensible to count.
-const CLOCK_START = new Date(`${TODAY}T13:35:00`).getTime();
 
 let idN = 1000;
 const newId = (prefix: string) => `${prefix}-${++idN}`;
@@ -147,8 +142,7 @@ const Ctx = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Data>(seedData);
   const [meId, setMeId] = useState<string | null>(null);
-  const [started] = useState(() => Date.now());
-  const [now, setNow] = useState(() => new Date(CLOCK_START));
+  const [now, setNow] = useState(() => new Date());
   const [guardianLink, setGuardianLink] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [sessionChecked, setSessionChecked] = useState(false);
   const [liveLink, setLiveLink] = useState<'checking' | 'connected' | 'offline'>('checking');
@@ -158,9 +152,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const notificationSaves = useRef(0);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date(CLOCK_START + (Date.now() - started))), 1000);
+    const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
-  }, [started]);
+  }, []);
 
   // Remember who is signed in across page changes within this tab.
   useEffect(() => {
@@ -176,10 +170,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const me = data.users.find((u) => u.id === meId) ?? null;
   // Local wall-clock time (no time zone suffix), matching how the seed times are written.
   const stamp = useCallback(() => {
-    const d = new Date(CLOCK_START + (Date.now() - started));
+    const d = new Date();
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  }, [started]);
+  }, []);
   const update = useCallback((fn: (d: Data) => Data) => setData((d) => fn(d)), []);
   const openSearches = data.emergencies.filter((e) => e.status === 'open').map((e) => e.id).join();
 
@@ -374,19 +368,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
-      fixClothing: (childId, clothing) => sendToday(userId, { action: 'fixClothing', childId, ...clothing, at: stamp() }),
-      checkIn: (childId, clothing) => sendToday(userId, { action: 'checkIn', childId, ...clothing, at: stamp() }),
-      release: (childId, personId) => sendToday(userId, { action: 'release', childId, personId, at: stamp() }),
-      refusePickup: (childId, nameGiven) => sendToday(userId, { action: 'refusePickup', childId, nameGiven, at: stamp() }),
-      reportMissing: (childId, lastSeenPlace, lastSeenTime) => sendToday(userId, { action: 'reportMissing', childId, lastSeenPlace, lastSeenTime, at: stamp() }),
-      acknowledge: (emergencyId) => sendToday(userId, { action: 'acknowledge', emergencyId, at: stamp() }),
+      fixClothing: (childId, clothing) => sendToday(userId, { action: 'fixClothing', childId, ...clothing }),
+      checkIn: (childId, clothing) => sendToday(userId, { action: 'checkIn', childId, ...clothing }),
+      release: (childId, personId) => sendToday(userId, { action: 'release', childId, personId }),
+      refusePickup: (childId, nameGiven) => sendToday(userId, { action: 'refusePickup', childId, nameGiven }),
+      reportMissing: (childId, lastSeenPlace, lastSeenTime) => sendToday(userId, { action: 'reportMissing', childId, lastSeenPlace, lastSeenTime }),
+      acknowledge: (emergencyId) => sendToday(userId, { action: 'acknowledge', emergencyId }),
       shareWithPolice: async (emergencyId) => {
-        await sendToday(userId, { action: 'shareWithPolice', emergencyId, at: stamp() });
+        await sendToday(userId, { action: 'shareWithPolice', emergencyId });
         const childId = data.emergencies.find((e) => e.id === emergencyId)?.childId;
         if (childId) update((d) => record(d, 'Shared details with police', childId));
       },
-      markNoticeMailed: (emergencyId) => sendToday(userId, { action: 'markNoticeMailed', emergencyId, at: stamp() }),
-      closeSearch: (emergencyId, outcome) => sendToday(userId, { action: 'closeSearch', emergencyId, outcome, at: stamp() }),
+      markNoticeMailed: (emergencyId) => sendToday(userId, { action: 'markNoticeMailed', emergencyId }),
+      closeSearch: (emergencyId, outcome) => sendToday(userId, { action: 'closeSearch', emergencyId, outcome }),
       updateChild: (childId, patch) =>
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)) })),
       addGroup: (name, level, instructorId) =>

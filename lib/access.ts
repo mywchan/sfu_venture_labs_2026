@@ -2,7 +2,10 @@
 // In the preview these run in the browser. In the real build the same checks
 // run on the server before any record leaves Piezas.
 
-import { TODAY_LESSON_DAY, type Child, type Data, type Emergency, type User } from './seed/data';
+import { TODAY, TODAY_LESSON_DAY, type Child, type Data, type Emergency, type User } from './seed/data';
+
+/** Today in words, for example "Sunday, November 8". */
+export const todayLabel = () => new Date(`${TODAY}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
 
 export const fullName = (c: Pick<Child, 'firstName' | 'lastName'>) => `${c.firstName} ${c.lastName}`;
 

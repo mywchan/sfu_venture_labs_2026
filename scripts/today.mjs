@@ -3,7 +3,9 @@
 //   npm run data:reset-today   (permanently deletes the preview day's records, for re-testing)
 import { Piezas } from '@piezas/sdk';
 
-const LESSON_DAY = 'day-2026-12-12'; // the preview's made-up day; other days are never touched
+// Today on this computer; other days are never touched.
+const now = new Date();
+const LESSON_DAY = `day-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const reset = process.argv[2] === 'reset';
 const piezas = new Piezas({ apiKey: process.env.PIEZAS_API_KEY });
 const t = { type: 'text' };

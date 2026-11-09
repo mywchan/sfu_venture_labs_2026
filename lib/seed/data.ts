@@ -125,9 +125,15 @@ export type Data = {
   accessRecords: AccessRecord[];
 };
 
-// The preview pretends today is the first Saturday of lessons.
-export const TODAY = '2026-12-12';
-export const TODAY_LESSON_DAY = 'day-2026-12-12';
+/** A date as YYYY-MM-DD in this computer's own time zone. */
+export function localDate(d = new Date()) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// Today comes from the system clock. Each new day starts with a clean slate.
+export const TODAY = localDate();
+export const TODAY_LESSON_DAY = `day-${TODAY}`;
 
 const at = (hhmm: string) => `${TODAY}T${hhmm}:00`;
 
@@ -297,9 +303,14 @@ export const consents: ConsentForm[] = children
   .map((c) => ({ childId: c.id, signedBy: 'Parent', signedDate: '2026-11-20', photoConsent: c.id !== 'c-lily' }));
 
 export const lessonDays: LessonDay[] = [
-  { id: 'day-2026-12-12', date: '2026-12-12', programDay: 'Saturday' },
-  { id: 'day-2026-12-19', date: '2026-12-19', programDay: 'Saturday' },
-  { id: 'day-2027-01-09', date: '2027-01-09', programDay: 'Saturday' },
+  { id: TODAY_LESSON_DAY, date: TODAY, programDay: new Date().getDay() === 0 ? 'Sunday' : 'Saturday' },
+  ...(
+    [
+      { id: 'day-2026-12-12', date: '2026-12-12', programDay: 'Saturday' },
+      { id: 'day-2026-12-19', date: '2026-12-19', programDay: 'Saturday' },
+      { id: 'day-2027-01-09', date: '2027-01-09', programDay: 'Saturday' },
+    ] as LessonDay[]
+  ).filter((d) => d.date !== TODAY),
 ];
 
 export const groups: Group[] = [
