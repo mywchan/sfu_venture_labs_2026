@@ -96,6 +96,17 @@ export type PatrolAck = { emergencyId: string; patrollerId: string; at: string }
 
 export type AccessRecord = { id: string; userId: string; role: Role; what: string; childId: string; at: string };
 
+export type AppNotification = {
+  id: string;
+  kind: string;
+  message: string;
+  href: string;
+  actionLabel: string;
+  urgent: boolean;
+  createdAt: string;
+  readAt: string | null;
+};
+
 export type Data = {
   users: User[];
   children: Child[];

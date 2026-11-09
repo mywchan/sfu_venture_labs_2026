@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
+import { NotificationBanners, NotificationBell } from '@/components/Notifications';
 import { useStore } from '@/lib/store';
 import type { Role } from '@/lib/seed/data';
 
@@ -45,6 +46,7 @@ export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean
         <span className="clock" title="Demo clock" data-testid="demo-clock">
           Sat Dec 12 · {now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
         </span>
+        <NotificationBell />
         <button
           type="button"
           data-testid="switch-person"
@@ -62,6 +64,7 @@ export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean
             Can’t reach Peak Pals, so this screen may be out of date and new entries may not save. Use your radio for anything urgent.
           </div>
         )}
+        <NotificationBanners />
         {children}
       </main>
     </>

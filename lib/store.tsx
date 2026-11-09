@@ -10,6 +10,7 @@ import {
   seedData,
   TODAY,
   TODAY_LESSON_DAY,
+  type AppNotification,
   type Attendance,
   type ChildPerson,
   type ConsentForm,
@@ -40,6 +41,8 @@ type Store = {
   guardianLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for adults?
   sessionChecked: boolean; // false until we've looked up who is signed in
   liveLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for today's records?
+  notifications: AppNotification[];
+  readNotifications: (ids: string[]) => Promise<void>;
   savePerson: (childId: string, person: Person, link: Omit<ChildPerson, 'id' | 'childId' | 'personId'>, linkId?: string) => Promise<void>;
   removeLink: (linkId: string) => Promise<void>;
   saveMedical: (alert: Omit<MedicalAlert, 'id'>, id?: string) => void;
@@ -151,6 +154,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [liveLink, setLiveLink] = useState<'checking' | 'connected' | 'offline'>('checking');
   // Counts saves, so a background refresh that started before a save can't overwrite it.
   const saves = useRef(0);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const notificationSaves = useRef(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date(CLOCK_START + (Date.now() - started))), 1000);
@@ -231,6 +236,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [meId, staff]);
 
+  // Notifications come from Peak Pals on the same 5-second beat as today's records.
+  useEffect(() => {
+    setNotifications([]);
+    if (!meId) return;
+    let stopped = false;
+    const load = async () => {
+      const startedAt = notificationSaves.current;
+      try {
+        const res = await fetch(`/api/notifications?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = (await res.json()) as { notifications: AppNotification[] };
+        if (!stopped && notificationSaves.current === startedAt) setNotifications(body.notifications);
+      } catch {
+        /* the "can't reach Peak Pals" banner already covers this */
+      }
+    };
+    void load();
+    const t = setInterval(load, staff ? 5_000 : 30_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId, staff]);
+
+  const readNotifications = useCallback(
+    async (ids: string[]) => {
+      if (!meId || ids.length === 0) return;
+      notificationSaves.current += 1;
+      // Disappears at once; the next refresh brings it back if the save failed.
+      const stamp = new Date().toISOString();
+      setNotifications((list) => list.map((n) => (ids.includes(n.id) ? { ...n, readAt: stamp } : n)));
+      try {
+        await fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ as: meId, ids }) });
+      } finally {
+        notificationSaves.current += 1;
+      }
+    },
+    [meId],
+  );
+
   /** Sends one action to Peak Pals. The screen only changes once it's saved. */
   const sendToday = useCallback(async (asUserId: string, action: Record<string, unknown>) => {
     saves.current += 1;
@@ -301,6 +346,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       guardianLink,
       sessionChecked,
       liveLink,
+      notifications,
+      readNotifications,
       savePerson: async (childId, person, link, linkId) => {
         const persons = data.persons.some((p) => p.id === person.id)
           ? data.persons.map((p) => (p.id === person.id ? person : p))
@@ -366,7 +413,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, pushGuardians, sendToday]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

@@ -13,12 +13,17 @@ import {
   TODAY,
   TODAY_LESSON_DAY,
   type Attendance,
+  type Data,
   type Emergency,
   type PatrolAck,
   type PickupRefusal,
   type User,
 } from '@/lib/seed/data';
 import { readGuardians } from './guardians';
+import { quietly } from './notifications';
+import { onAcknowledged } from './notify-acknowledged';
+import { clearRemindersOnAcknowledged, onMissingReported, onSearchClosed } from './notify-patrol';
+import { currentRoster } from './roster';
 
 export type TodayRows = {
   attendance: Attendance[];
@@ -182,17 +187,17 @@ const toRefusal = (r: Stored): PickupRefusal => ({
 
 const toAck = (r: Stored): PatrolAck => ({ emergencyId: String(r.data.emergencyId), patrollerId: String(r.data.patrollerId), at: String(r.data.at) });
 
-const teaches = (user: User, childId: string) => user.role === 'instructor' && groupForInstructor(seedData, user).kids.some((c) => c.id === childId);
+const teaches = (roster: Data, user: User, childId: string) => user.role === 'instructor' && groupForInstructor(roster, user).kids.some((c) => c.id === childId);
 
-function seesAttendance(user: User, childId: string) {
+function seesAttendance(roster: Data, user: User, childId: string) {
   if (user.role === 'desk' || user.role === 'admin') return true;
   if (user.role === 'parent') return parentOwnsChild(seedData, user, childId);
-  return teaches(user, childId);
+  return teaches(roster, user, childId);
 }
 
-function seesSearch(user: User, childId: string) {
+function seesSearch(roster: Data, user: User, childId: string) {
   if (user.role === 'desk' || user.role === 'admin' || user.role === 'patrol') return true;
-  return teaches(user, childId);
+  return teaches(roster, user, childId);
 }
 
 /** Today's records, cut down to what this person's role is allowed to see. */
@@ -200,6 +205,7 @@ export async function readToday(user: User): Promise<TodayRows> {
   const { attendance, refusal, emergency, ack } = await records();
   const day = { lessonDayId: TODAY_LESSON_DAY };
   const staffOnly = user.role === 'desk' || user.role === 'admin';
+  const roster = user.role === 'instructor' ? await currentRoster() : seedData;
   const [attendanceRows, refusalRows, emergencyRows, ackRows] = await Promise.all([
     user.role === 'patrol' ? [] : listAll(attendance, day),
     staffOnly ? listAll(refusal, day) : [],
@@ -209,9 +215,9 @@ export async function readToday(user: User): Promise<TodayRows> {
 
   const onePerChild = new Map<string, Attendance>();
   for (const row of attendanceRows.map(toAttendance)) {
-    if (!onePerChild.has(row.childId) && seesAttendance(user, row.childId)) onePerChild.set(row.childId, row);
+    if (!onePerChild.has(row.childId) && seesAttendance(roster, user, row.childId)) onePerChild.set(row.childId, row);
   }
-  const emergencies = emergencyRows.map(toEmergency).filter((e) => seesSearch(user, e.childId)).reverse();
+  const emergencies = emergencyRows.map(toEmergency).filter((e) => seesSearch(roster, user, e.childId)).reverse();
   const emergencyIds = new Set(emergencies.map((e) => e.id));
   const seenAcks = new Set<string>();
   const acks = ackRows.map(toAck).filter((a) => {
@@ -274,6 +280,7 @@ function requireRole(user: User, allowed: boolean) {
 export async function perform(user: User, raw: Record<string, unknown>): Promise<TodayRows> {
   const { attendance, refusal, emergency, ack } = await records();
   const action = raw.action;
+  const roster = await currentRoster();
 
   if (action === 'acknowledge' || action === 'shareWithPolice' || action === 'markNoticeMailed' || action === 'closeSearch') {
     requireRole(user, user.role === 'patrol');
@@ -293,7 +300,11 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
 
     if (action === 'acknowledge') {
       const existing = await listAll(ack, { emergencyId, patrollerId: user.id });
-      if (existing.length === 0) await ack.create({ title: `${user.name} on ${em.childId}`, data: { emergencyId, patrollerId: user.id, at } });
+      if (existing.length === 0) {
+        await ack.create({ title: `${user.name} on ${em.childId}`, data: { emergencyId, patrollerId: user.id, at } });
+        await quietly(() => clearRemindersOnAcknowledged(emergencyId));
+        await quietly(() => onAcknowledged({ emergencyId, childId: em.childId, patroller: user }));
+      }
     } else if (action === 'shareWithPolice') {
       if (!em.sharedWithPoliceAt) await emergency.update(record.id, { data: { ...record.data, sharedWithPoliceAt: at, sharedWithPoliceBy: user.id } });
     } else {
@@ -302,6 +313,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
       // Two people reporting at the same moment can open two entries; end them together.
       for (const open of all.filter((r) => toEmergency(r).status === 'open' && r.data.childId === em.childId)) {
         await emergency.update(open.id, { data: { ...open.data, status: 'closed', closedAt: at, closedBy: user.id, outcome } });
+        await quietly(() => onSearchClosed(open.id));
       }
     }
     return readToday(user);
@@ -313,7 +325,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
   const at = clockTime(raw);
 
   if (action === 'checkIn' || action === 'fixClothing') {
-    requireRole(user, action === 'checkIn' ? user.role === 'desk' : teaches(user, childId));
+    requireRole(user, action === 'checkIn' ? user.role === 'desk' : teaches(roster, user, childId));
     const clothing = {
       jacket: field(raw, 'jacket', 40, 'the jacket colour'),
       pants: field(raw, 'pants', 40, 'the pants colour'),
@@ -365,14 +377,14 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
   }
 
   if (action === 'reportMissing') {
-    requireRole(user, user.role === 'desk' || user.role === 'admin' || teaches(user, childId));
+    requireRole(user, user.role === 'desk' || user.role === 'admin' || teaches(roster, user, childId));
     const lastSeenPlace = field(raw, 'lastSeenPlace', 200, 'where they were last seen');
     const lastSeenTime = typeof raw.lastSeenTime === 'string' ? raw.lastSeenTime : '';
     if (!HOUR_MINUTE.test(lastSeenTime)) throw new Refused('Please check the time they were last seen.', 422);
     // Already being searched for: don't start a second search.
     if ((await openFor()).length === 0) {
       const { row } = await currentAttendance(attendance, childId);
-      await emergency.create({
+      const created = await emergency.create({
         title: `Missing: ${childId}`,
         data: withoutBlanks({
           childId,
@@ -388,6 +400,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
           noticeMailed: false,
         }),
       });
+      await quietly(() => onMissingReported({ emergencyId: created.id, childId, lastSeenPlace }));
     }
     return readToday(user);
   }
