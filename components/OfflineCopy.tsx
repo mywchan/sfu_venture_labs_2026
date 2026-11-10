@@ -177,21 +177,21 @@ const t = (iso: string) => new Date(iso).toLocaleTimeString('en-CA', { hour: 'nu
 
 export function OfflineCopyCard({ copy, onSave, onRemove, onView, error, canSave }: { copy: OfflineSnapshot | null; onSave: () => void; onRemove: () => void; onView: () => void; error?: string | null; canSave: boolean }) {
   return (
-    <section className="card" data-testid="offline-card">
+    <section className={copy ? 'card offline-saved' : 'card'} data-testid="offline-card">
       {error && <p className="field-error" role="alert" data-testid="offline-error">{error}</p>}
       {copy ? (
         <>
           <div className="row between">
             <strong>Saved on this phone at {t(copy.savedAt)}</strong>
-            <span className="chip ok">Saved to this browser</span>
+            <span className="chip fill dark">Saved to this browser</span>
           </div>
-          <p className="small muted" style={{ marginTop: 6 }}>
+          <p className="small" style={{ marginTop: 6 }}>
             Names, clothing and short alerts only. Keep this page open: reopening without a connection is not supported. Save again after changes.
           </p>
-          <div className="row">
-            <button type="button" className="primary" disabled={!canSave} onClick={onSave} data-testid="offline-save">Update saved copy</button>
-            <button type="button" onClick={onView} data-testid="offline-view">View offline copy</button>
-            <button type="button" className="ghost" onClick={onRemove} data-testid="offline-delete">Delete</button>
+          <div className="button-stack">
+            <button type="button" className="white" disabled={!canSave} onClick={onSave} data-testid="offline-save">Update saved copy</button>
+            <button type="button" className="black" onClick={onView} data-testid="offline-view">View offline copy</button>
+            <button type="button" className="pink" onClick={onRemove} data-testid="offline-delete">Delete</button>
           </div>
         </>
       ) : (
@@ -203,7 +203,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView, error, canSave
           <button type="button" className="primary big" disabled={!canSave} onClick={onSave} data-testid="offline-save">Save for offline</button>
         </>
       )}
-      <p className="small muted" style={{ marginTop: 12, marginBottom: 0 }}>Expires at 4 p.m. on the preview clock. Expiry is checked and deletion attempted while this screen is open. Closing the app does not erase the copy. Delete it before sharing this device.</p>
+      <p className={copy ? 'small' : 'small muted'} style={{ marginTop: 12, marginBottom: 0 }}>Expires at 4 p.m. on the preview clock. Expiry is checked and deletion attempted while this screen is open. Closing the app does not erase the copy. Delete it before sharing this device.</p>
     </section>
   );
 }
@@ -211,7 +211,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView, error, canSave
 export function OfflineCopyView({ copy, online, onBack }: { copy: OfflineSnapshot; online: boolean; onBack?: () => void }) {
   return (
     <div data-testid="offline-copy">
-      <div className="banner warn">
+      <div className="banner fill warn">
         {online ? 'Offline copy' : 'No connection. Showing your offline copy'} (saved {t(copy.savedAt)}). It may be out of date. Full medical details and contacts are not included. Keep this page open; reopening offline is not supported.
       </div>
       <h1>{copy.groupName} · Level {copy.level}</h1>
@@ -222,7 +222,7 @@ export function OfflineCopyView({ copy, online, onBack }: { copy: OfflineSnapsho
             <div className="small muted">Age {k.age} · Bib {k.bib}{k.clothing ? ` · ${k.clothing}` : ' · not checked in when saved'}</div>
           </div>
           {k.alerts.map((a) => (
-            <div key={a.shortAlert} className={`alert-line ${a.severity}`}>
+            <div key={a.shortAlert} className={`alert-block ${a.severity}`}>
               ⚠ {a.shortAlert}
               {a.medicationLocation && a.medicationLocation !== 'None' ? <span style={{ fontWeight: 400 }}> · Medication: {a.medicationLocation}</span> : null}
             </div>
@@ -231,7 +231,7 @@ export function OfflineCopyView({ copy, online, onBack }: { copy: OfflineSnapsho
       ))}
       <p className="small muted">To report a missing child with no connection, use your radio.</p>
       <p className="small muted">Expires at {t(copy.expiresAt)} on the preview clock. Closing the app does not erase browser storage.</p>
-      {onBack && online && <button type="button" onClick={onBack} data-testid="offline-back">Back to live list</button>}
+      {onBack && online && <button type="button" className="white wide" onClick={onBack} data-testid="offline-back">Back to live list</button>}
     </div>
   );
 }

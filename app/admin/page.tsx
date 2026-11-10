@@ -28,20 +28,25 @@ function Admin() {
     ['upload', 'Store spreadsheet'],
   ];
   return (
-    <>
-      <h1>Snow school office</h1>
-      <div className="tabs" role="tablist">
-        {tabs.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} data-testid={`admin-tab-${id}`}>{label}</button>
-        ))}
+    <div className="side-layout">
+      <nav className="side-nav" aria-label="Office sections">
+        <h1>Snow school office</h1>
+        <p className="subtitle">Administrator</p>
+        <div className="tabs side" role="tablist">
+          {tabs.map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} data-testid={`admin-tab-${id}`}>{label}</button>
+          ))}
+        </div>
+      </nav>
+      <div style={{ minWidth: 0 }}>
+        {tab === 'missing' && <MissingTab />}
+        {tab === 'groups' && <GroupsTab />}
+        {tab === 'children' && <ChildrenTab />}
+        {tab === 'accounts' && <AccountsTab />}
+        {tab === 'access' && <AccessTab />}
+        {tab === 'upload' && <UploadTab />}
       </div>
-      {tab === 'missing' && <MissingTab />}
-      {tab === 'groups' && <GroupsTab />}
-      {tab === 'children' && <ChildrenTab />}
-      {tab === 'accounts' && <AccountsTab />}
-      {tab === 'access' && <AccessTab />}
-      {tab === 'upload' && <UploadTab />}
-    </>
+    </div>
   );
 }
 
@@ -202,7 +207,7 @@ function ChildrenTab() {
                   <td data-testid={`child-level-${c.id}`}>{c.level}</td>
                   <td>{c.programDay}</td>
                   <td className="small">{c.orderNumber}</td>
-                  <td>{search ? <span className="chip danger">Missing</span> : a?.pickupAt ? 'Gone home' : a?.checkInAt ? 'Here' : '—'}</td>
+                  <td>{search ? <span className="chip danger">Missing</span> : a?.pickupAt ? <span className="chip outline">Gone home</span> : a?.checkInAt ? <span className="chip ok">Here</span> : '—'}</td>
                   <td className="small" data-testid={`child-checkin-${c.id}`}>
                     {a?.checkInAt ? (
                       <>
@@ -220,11 +225,13 @@ function ChildrenTab() {
                       <span className="muted">Not checked in</span>
                     )}
                   </td>
-                  <td className="row" style={{ gap: 6 }}>
-                    <button type="button" onClick={() => setEditing(c)} data-testid={`edit-${c.id}`}>Edit</button>
-                    {a?.checkInAt && !a.pickupAt && !search && (
-                      <button type="button" className="ghost" style={{ color: 'var(--danger)' }} onClick={() => setMissing(c)}>Report missing</button>
-                    )}
+                  <td>
+                    <div className="button-stack" style={{ gap: 6 }}>
+                      <button type="button" className="yellow small" onClick={() => setEditing(c)} data-testid={`edit-${c.id}`}>Edit</button>
+                      {a?.checkInAt && !a.pickupAt && !search && (
+                        <button type="button" className="danger small" style={{ whiteSpace: 'nowrap' }} onClick={() => setMissing(c)}>Report missing</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -270,7 +277,7 @@ function EditChild({ child, onClose }: { child: Child; onClose: () => void }) {
           </div>
         </div>
         <p className="small muted">Contacts, pickup adults and medical details are entered by parents. You can also edit them from the child’s record in the full build.</p>
-        <div className="row"><button className="primary" type="submit" data-testid="edit-save">Save</button><button className="ghost" type="button" onClick={onClose}>Cancel</button></div>
+        <div className="button-stack"><button className="primary" type="submit" data-testid="edit-save">Save</button><button type="button" onClick={onClose}>Cancel</button></div>
       </form>
     </div>
   );

@@ -33,17 +33,31 @@
 }
 
 .selected {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
+
+/* Countdown: the yellow block from the wireframes. */
+.countdown { background: var(--yellow); color: var(--paper); border-color: var(--yellow); }
+.countdown :global(.big-number) { color: var(--paper); }
+
+/* Medical alert: coloured heading strip over a black body. */
+.alertCard { padding: 0; overflow: hidden; margin-bottom: 10px; }
+.alertHeader { text-align: center; font-size: 13px; font-weight: 700; padding: 4px; color: var(--paper); background: var(--rule); }
+.alertBody { padding: 10px var(--space-md); }
+.high { border-color: var(--red); }
+.high .alertHeader { background: var(--red); }
+.medium { border-color: var(--pink); }
+.medium .alertHeader { background: var(--pink); }
+.low .alertHeader { background: var(--ink); }
 
 .childName { margin: 0; font-size: 1rem; }
 .cardStatuses { display: flex; flex-wrap: wrap; gap: 6px; }
 .currentIndicator {
-  color: var(--brand);
-  background: var(--surface-2);
+  color: var(--paper);
+  background: var(--ink-color);
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   text-align: center;
   font-size: 0.875rem;
   font-weight: 600;
@@ -72,10 +86,10 @@
 .selectPrompt { margin: 0; }
 .closedSearches { overflow-x: auto; }
 
-.snapshot { border-top: 3px solid var(--brand); }
+.snapshot { position: relative; }
 .snapshotHeading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .snapshotName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.2rem; font-weight: 700; margin: 0; }
-.lastKnown { background: var(--surface-2); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.lastKnown { border: 1.5px solid var(--ink); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px; }
 .lastKnown p { margin-bottom: 4px; }
 .snapshotDeadline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .snapshot .identification { margin-bottom: 12px; }

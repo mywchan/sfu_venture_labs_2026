@@ -155,7 +155,7 @@ function Patrol() {
           <h2>Closed searches today</h2>
           <p className="small muted">Children’s details are no longer available once a search is closed.</p>
           {closedError && <div className="banner danger" data-testid="closed-error">{closedError}</div>}
-          <table>
+          <div className="table-wrap"><table>
             <thead><tr><th>Child</th><th>Closed</th><th>Outcome</th><th>Notice to family</th><th>Activity</th></tr></thead>
             <tbody>
               {closed.map((e) => {
@@ -171,7 +171,7 @@ function Patrol() {
                       ) : e.noticeMailed ? (
                         'Mailed'
                       ) : (
-                        <button type="button" onClick={() => markNoticeMailed(e.id).then(() => setClosedError(null), (err: Error) => setClosedError(err.message))}>To mail · mark done</button>
+                        <button type="button" className="yellow small" onClick={() => markNoticeMailed(e.id).then(() => setClosedError(null), (err: Error) => setClosedError(err.message))}>To mail · mark done</button>
                       )}
                     </td>
                     <td><details><summary>Recorded activity</summary><IncidentActivity em={e} /></details></td>
@@ -179,7 +179,7 @@ function Patrol() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </section>
       )}
     </>
@@ -227,7 +227,7 @@ function SearchScreen({ em }: { em: Emergency }) {
 
   return (
     <div id="patrol-incident-detail" className={styles.detail} data-testid="search-screen">
-      <div className="banner danger" style={{ fontSize: '1.1rem' }}>
+      <div className="banner fill danger" style={{ fontSize: 'var(--text-body-lg)' }}>
         MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · {minsMissing === null ? 'last-seen time needs verification' : `missing ${minsMissing} min`}
       </div>
       {error && <div className="banner danger" data-testid="search-save-error">{error}</div>}
@@ -245,7 +245,7 @@ function SearchScreen({ em }: { em: Emergency }) {
           <div className={styles.identification}>
             <div
               aria-label={consent?.photoConsent ? 'Photo' : 'No photo consent'}
-              style={{ width: 84, height: 100, borderRadius: 8, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: consent?.photoConsent ? '1.8rem' : '0.75rem', color: 'var(--ink-2)', textAlign: 'center', padding: 4 }}
+              style={{ width: 84, height: 100, borderRadius: 8, border: '1.5px solid var(--ink)', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: consent?.photoConsent ? '1.8rem' : '0.75rem', color: 'var(--ink-2)', textAlign: 'center', padding: 4 }}
               data-testid="search-photo"
             >
               {consent?.photoConsent ? `${child.firstName[0]}${child.lastName[0]}` : 'No photo consent'}
@@ -281,23 +281,27 @@ function SearchScreen({ em }: { em: Emergency }) {
       </section>
 
       <div className={styles.detailGrid}>
-        <section className="card" data-testid="search-countdown">
+        <section className={`card ${styles.countdown}`} data-testid="search-countdown">
           <h2>Escalation</h2>
           <h3>{deadline ? `Call police by ${timeLabel(deadline.toISOString())}` : 'Time unavailable — verify last seen'}</h3>
-          <div className="big-number" role="timer" aria-label="Time to escalation deadline" data-testid="escalation-timer" style={{ color: minsLeft <= 10 ? 'var(--danger)' : undefined }}>
+          <div className="big-number" role="timer" aria-label="Time to escalation deadline" data-testid="escalation-timer" style={{ color: minsLeft <= 10 ? '#a3120a' : undefined }}>
             {!deadline ? 'Verify escalation timing now' : msLeft > 0 ? `${countdown(msLeft)} remaining` : `Overdue by ${countdown(msLeft)}`}
           </div>
-          {deadline && msLeft <= 0 && <p className="field-error">Call police now and contact the family. These are human actions; the app does not make calls.</p>}
-          <p className="small muted">60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
+          {deadline && msLeft <= 0 && <p style={{ color: '#a3120a', fontWeight: 700 }}>Call police now and contact the family. These are human actions; the app does not make calls.</p>}
+          <p className="small" style={{ margin: 0 }}>60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
+        </section>
+
+        <section className="card" aria-label="Police record">
+          <h2>Record: details shared with police</h2>
           {!em.sharedWithPoliceAt ? (
-            <button type="button" disabled={saving} onClick={() => void save(() => shareWithPolice(em.id))} data-testid="share-police">Record: details shared with police</button>
+            <button type="button" className="white wide" disabled={saving} onClick={() => void save(() => shareWithPolice(em.id))} data-testid="share-police">Record: details shared with police</button>
           ) : (
             <div className="stack">
-              <div className="banner warn" data-testid="police-shared">Shared with police at {recordedTime(em.sharedWithPoliceAt)}</div>
+              <div data-testid="police-shared">Shared with police at {recordedTime(em.sharedWithPoliceAt)}</div>
               {!em.noticeMailed ? (
-                <div className="row between card" style={{ margin: 0 }} data-testid="notice-todo">
-                  <span>Mail a notice to the family (privacy law)</span>
-                  <button type="button" disabled={saving} onClick={() => void save(() => markNoticeMailed(em.id))}>Mark done</button>
+                <div className="row between" data-testid="notice-todo">
+                  <span><span className="chip fill warn">To do</span> Mail a notice to the family (privacy law)</span>
+                  <button type="button" className="yellow" disabled={saving} onClick={() => void save(() => markNoticeMailed(em.id))}>Mark done</button>
                 </div>
               ) : (
                 <span className="chip ok">Notice mailed</span>
@@ -309,9 +313,13 @@ function SearchScreen({ em }: { em: Emergency }) {
         <section className="card" data-testid="search-medical">
           <h2>Medical alerts</h2>
           {medicalLink !== 'connected' && alerts.length === 0 ? <p className={medicalLink === 'offline' ? 'field-error' : 'muted'} data-testid="medical-not-loaded">{medicalLink === 'offline' ? 'Can’t load medical alerts. Call the family.' : 'Loading medical alerts…'}</p> : alerts.length === 0 ? <p className="muted">No medical alerts.</p> : alerts.map((a) => (
-            <div key={a.id} style={{ marginBottom: 10 }}>
-              <div className={`alert-line ${a.severity}`}>{a.shortAlert}</div>
-              <p className="small" style={{ margin: '6px 0 0' }}>{a.details} Medication: {a.medicationLocation}.</p>
+            <div key={a.id} className={`card ${styles.alertCard} ${styles[a.severity]}`}>
+              <div className={styles.alertHeader}>{a.severity === 'high' ? 'Life-threatening' : a.severity === 'medium' ? 'Needs attention' : 'Good to know'}</div>
+              <div className={styles.alertBody}>
+                <strong>{a.shortAlert}</strong>
+                {a.details && <p className="small" style={{ margin: '6px 0 0' }}>Details: {a.details}</p>}
+                <p className="small" style={{ margin: '4px 0 0', fontWeight: 700 }}>Medication: {a.medicationLocation}.</p>
+              </div>
             </div>
           ))}
         </section>
@@ -320,13 +328,12 @@ function SearchScreen({ em }: { em: Emergency }) {
           {guardianLink === 'offline' && (
             <div className="banner danger" data-testid="guardians-stale">Can’t reach Peak Pals, so these contacts may be out of date.</div>
           )}
-          <h2>Emergency contacts</h2>
+          <h2>Emergency contacts (tap to call)</h2>
           {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
             <p key={link.id}>
-              <strong>{link.contactOrder}. {person.name}</strong> ({link.relationship})<br />
-              <a href={`tel:${person.phone}`}>{person.phone}</a>
-              <br />
-              <span className={`chip ${link.canPickUp ? 'ok' : ''}`}>{link.canPickUp ? 'Can pick up' : 'Not allowed to pick up'}</span>
+              <strong>{link.contactOrder}. {person.name}</strong> ({link.relationship})
+              <span className={`chip ${link.canPickUp ? 'ok' : ''}`} style={{ marginLeft: 8 }}>{link.canPickUp ? 'Can pick up' : 'Not allowed to pick up'}</span>
+              <a className="btn white wide" style={{ marginTop: 6 }} href={`tel:${person.phone}`}>Call {person.name} · {person.phone}</a>
             </p>
           ))}
           <h3>Other adults allowed to pick up</h3>
@@ -344,7 +351,7 @@ function SearchScreen({ em }: { em: Emergency }) {
         <h2>Resolve search</h2>
         <p className="small muted">Record the outcome when the search is complete.</p>
         {!closing ? (
-          <button type="button" onClick={() => setClosing(true)} data-testid="close-search">Close search</button>
+          <button type="button" className="pink wide" onClick={() => setClosing(true)} data-testid="close-search">Close search</button>
         ) : (
           <form
             className={styles.closureForm}
@@ -361,7 +368,7 @@ function SearchScreen({ em }: { em: Emergency }) {
               <option>False alarm</option>
             </select>
             <button className="primary" type="submit" disabled={saving} data-testid="close-confirm">Close search</button>
-            <button className="ghost" type="button" onClick={() => setClosing(false)}>Cancel</button>
+            <button type="button" onClick={() => setClosing(false)}>Cancel</button>
           </form>
         )}
       </section>
