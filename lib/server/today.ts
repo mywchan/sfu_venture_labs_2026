@@ -9,6 +9,7 @@
 import { Piezas } from '@piezas/sdk';
 import { groupForInstructor, parentOwnsChild } from '@/lib/access';
 import {
+  localDate,
   seedData,
   TODAY,
   TODAY_LESSON_DAY,
@@ -44,7 +45,6 @@ export class Refused extends Error {
 
 const PAGE_SIZE = 100;
 const OUTCOMES = ['Found safe', 'Found, needed first aid', 'Handed over to police', 'False alarm'];
-const WALL_CLOCK = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
 const HOUR_MINUTE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 async function setUp() {
@@ -265,11 +265,11 @@ function field(raw: Record<string, unknown>, name: string, max: number, label: s
   return value;
 }
 
-function clockTime(raw: Record<string, unknown>) {
-  // The preview's made-up clock. When the real clock arrives, the server sets this.
-  const at = raw.at;
-  if (typeof at !== 'string' || !WALL_CLOCK.test(at)) throw new Refused('The time on this request is not valid.', 422);
-  return at;
+/** Times are set here, from the system clock, so a phone with the wrong time can't change the record. */
+function systemTime() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${localDate(d)}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 function requireRole(user: User, allowed: boolean) {
@@ -296,7 +296,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
       return readToday(user);
     }
     if (em.status !== 'open') throw new Refused('This search has already been closed.');
-    const at = clockTime(raw);
+    const at = systemTime();
 
     if (action === 'acknowledge') {
       const existing = await listAll(ack, { emergencyId, patrollerId: user.id });
@@ -322,7 +322,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
   const childId = typeof raw.childId === 'string' ? raw.childId : '';
   if (!seedData.children.some((c) => c.id === childId)) throw new Refused('Not found', 404);
   const openFor = async () => (await listAll(emergency, { childId, lessonDayId: TODAY_LESSON_DAY })).filter((r) => toEmergency(r).status === 'open');
-  const at = clockTime(raw);
+  const at = systemTime();
 
   if (action === 'checkIn' || action === 'fixClothing') {
     requireRole(user, action === 'checkIn' ? user.role === 'desk' : teaches(roster, user, childId));
