@@ -4,7 +4,8 @@ import 'server-only';
 // is enforced here: the desk gets nothing, an instructor only their own group,
 // patrol only children in an open search, a parent only their own children.
 
-import { groupForInstructor, parentOwnsChild } from '@/lib/access';
+import { fullName, groupForInstructor, groupOfChild, parentOwnsChild } from '@/lib/access';
+import { notify, quietly } from './notifications';
 import { seedData, TODAY, type ConsentForm, type Data, type MedicalAlert, type Severity, type User } from '@/lib/seed/data';
 import { seedConsents, seedMedical } from './medical-seed';
 import { recordsClient } from './demo-store';
@@ -184,18 +185,41 @@ export async function changeMedical(user: User, raw: Record<string, unknown>): P
     if (raw.id) {
       const row = find(raw.id);
       await alert.update(row.id, { title: shortAlert, data: { ...row.data, ...data } });
+      await tellInstructor(user, roster, childId, 'updated medical information for');
     } else {
       await alert.create({ title: shortAlert, data });
+      await tellInstructor(user, roster, childId, 'added new medical information for');
     }
     await setAnswer(false);
   } else if (raw.action === 'removeAlert') {
     await alert.delete(find(raw.id).id);
+    await tellInstructor(user, roster, childId, 'removed a medical alert for');
   } else if (raw.action === 'setNoMedical') {
     if (typeof raw.value !== 'boolean') throw new Refused('That request could not be read.', 400);
     if (raw.value && alerts.length > 0) throw new Refused('Remove the alerts on file before saying there are none.');
+    const changed = saved.data.noMedicalConditions !== raw.value;
     await setAnswer(raw.value);
+    if (changed) await tellInstructor(user, roster, childId, 'updated medical information for');
   } else {
     throw new Refused('That request could not be read.', 400);
   }
   return readMedical(user);
+}
+
+/** Lets the child's instructor today know a parent changed their medical details. */
+async function tellInstructor(user: User, roster: Data, childId: string, what: string) {
+  if (user.role !== 'parent') return;
+  const group = groupOfChild(roster, childId);
+  const child = roster.children.find((c) => c.id === childId);
+  if (!group || !child) return;
+  await quietly(() =>
+    notify([group.instructorId], {
+      kind: 'medical_changed',
+      message: `${user.name} (parent) ${what} ${fullName(child)}. Please review it before your lesson.`,
+      href: '/instructor',
+      actionLabel: 'View children',
+      refId: childId,
+      key: `medical|${childId}|${Date.now()}`,
+    }),
+  );
 }
