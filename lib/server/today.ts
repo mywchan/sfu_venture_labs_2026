@@ -203,7 +203,7 @@ export async function readToday(user: User): Promise<TodayRows> {
     user.role === 'patrol' ? [] : listAll(attendance, day),
     staffOnly ? listAll(refusal, day) : [],
     user.role === 'parent' ? [] : listAll(emergency, day),
-    user.role === 'patrol' ? listAll(ack, {}) : [],
+    user.role === 'parent' ? [] : listAll(ack, {}),
   ]);
 
   const onePerChild = new Map<string, Attendance>();

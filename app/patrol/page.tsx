@@ -7,6 +7,51 @@ import { TODAY, type Emergency } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
 import styles from './patrol.module.css';
 
+// Validate before using the existing deadline rule; never invent a replacement time.
+function incidentDeadline(value: unknown, now: Date): Date | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/.test(value)) return null;
+  const seen = new Date(value).getTime();
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!Number.isFinite(seen) || seen > now.getTime() || month < 1 || month > 12 ||
+      day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate() ||
+      Number(value.slice(11, 13)) > 23 || Number(value.slice(14, 16)) > 59 || Number(value.slice(17, 19)) > 59) return null;
+  const deadline = policeDeadline(value);
+  return Number.isFinite(deadline.getTime()) ? deadline : null;
+}
+
+const recordedTime = (value: string | null) =>
+  value && Number.isFinite(new Date(value).getTime()) ? timeLabel(value) : 'Time unavailable';
+
+function countdown(ms: number) {
+  const seconds = Math.ceil(Math.abs(ms) / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/** Recorded facts only. Closed searches never expose last-seen/identifying details. */
+function IncidentActivity({ em }: { em: Emergency }) {
+  const { data, now } = useStore();
+  const events: { id: string; label: string; at: string | null; detail?: string }[] = [];
+  if (em.status === 'open') events.push({ id: 'seen', label: 'Last seen',
+    at: incidentDeadline(em.lastSeenAt, now) ? em.lastSeenAt : null, detail: em.lastSeenPlace });
+  data.acks.filter((a) => a.emergencyId === em.id).forEach((a, i) => {
+    events.push({ id: `ack-${i}`, label: `Patrol acknowledged · ${userName(data, a.patrollerId)}`, at: a.at });
+  });
+  if (em.sharedWithPoliceAt) events.push({ id: 'police', label: 'Police disclosure recorded', at: em.sharedWithPoliceAt });
+  if (em.status === 'closed') events.push({ id: 'closed', label: 'Search closed', at: em.closedAt, detail: em.outcome ?? 'Outcome not recorded' });
+  const order = (at: string | null) => at && Number.isFinite(Date.parse(at)) ? Date.parse(at) : Number.MAX_SAFE_INTEGER;
+  events.sort((a, b) => order(a.at) - order(b.at));
+  return (
+    <ol className={styles.timeline} aria-label="Recorded incident activity" data-testid="incident-timeline">
+      {events.map((event) => (
+        <li key={event.id}>
+          <span className={styles.eventTime}>{event.at && Number.isFinite(Date.parse(event.at)) ? <time dateTime={event.at}>{recordedTime(event.at)}</time> : 'Time unavailable'}</span>
+          <div><strong>{event.label}</strong>{event.detail && <p className="small muted">{event.detail}</p>}</div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function PatrolHome() {
   return (
     <Shell role="patrol">
@@ -19,7 +64,7 @@ function Patrol() {
   const { data, now, markNoticeMailed } = useStore();
   const [closedError, setClosedError] = useState<string | null>(null);
   const open = data.emergencies.filter((e) => e.status === 'open')
-    .sort((a, b) => policeDeadline(a.lastSeenAt).getTime() - policeDeadline(b.lastSeenAt).getTime());
+    .sort((a, b) => (incidentDeadline(a.lastSeenAt, now)?.getTime() ?? 0) - (incidentDeadline(b.lastSeenAt, now)?.getTime() ?? 0));
   const closed = data.emergencies.filter((e) => e.status === 'closed');
   const [openId, setOpenId] = useState<string | null>(null);
   const current = open.find((e) => e.id === openId) ?? (open.length === 1 ? open[0] : null);
@@ -40,15 +85,15 @@ function Patrol() {
           <section className={styles.incidentList} aria-labelledby="active-incidents-heading" data-testid="active-incidents">
             <div className={styles.listHeading}>
               <h2 id="active-incidents-heading">Active incidents ({open.length})</h2>
-              <span className="small muted">Earliest escalation deadline first</span>
+              <span className="small muted">Unknown times first for verification, then earliest escalation deadline</span>
             </div>
             <div className={styles.incidentGrid}>
               {open.map((e) => {
                 const c = data.children.find((x) => x.id === e.childId);
                 const name = c ? fullName(c) : 'Child information unavailable';
-                const deadline = policeDeadline(e.lastSeenAt);
-                const minutesLeft = Math.ceil((deadline.getTime() - now.getTime()) / 60_000);
-                const overdue = deadline.getTime() <= now.getTime();
+                const deadline = incidentDeadline(e.lastSeenAt, now);
+                const minutesLeft = deadline ? Math.ceil((deadline.getTime() - now.getTime()) / 60_000) : Infinity;
+                const overdue = !!deadline && deadline.getTime() <= now.getTime();
                 const urgent = minutesLeft <= 10;
                 const acks = data.acks.filter((a) => a.emergencyId === e.id);
                 const selected = current?.id === e.id;
@@ -61,16 +106,16 @@ function Patrol() {
                     </div>
                     <div className={styles.cardStatuses}>
                       <span className={`chip ${overdue || urgent ? 'danger' : ''}`} data-testid="incident-urgency">
-                        {overdue ? 'Overdue · escalation action required' : urgent ? `Urgent · ${minutesLeft} min left` : `${minutesLeft} min to escalation`}
+                        {!deadline ? 'Time unavailable — verify last seen' : overdue ? 'Overdue · escalation action required' : urgent ? `Urgent · ${minutesLeft} min left` : `${minutesLeft} min to escalation`}
                       </span>
                       <span className={`chip ${acks.length ? 'ok' : 'warn'}`} data-testid="incident-ack-status">
                         {acks.length ? `Acknowledged · ${acks.length} ${acks.length === 1 ? 'patroller' : 'patrollers'}` : 'Unacknowledged'}
                       </span>
                     </div>
                     <dl className={styles.incidentFacts}>
-                      <div><dt>Last seen</dt><dd>{e.lastSeenPlace} · <time dateTime={e.lastSeenAt}>{timeLabel(e.lastSeenAt)}</time></dd></div>
+                      <div><dt>Last seen</dt><dd>{e.lastSeenPlace} · {deadline ? <time dateTime={e.lastSeenAt}>{timeLabel(e.lastSeenAt)}</time> : 'Time unavailable'}</dd></div>
                       <div><dt>Reported by</dt><dd>{userName(data, e.reportedBy)}</dd></div>
-                      <div><dt>Escalation deadline</dt><dd><time dateTime={deadline.toISOString()}>{timeLabel(deadline.toISOString())}</time></dd></div>
+                      <div><dt>Escalation deadline</dt><dd>{deadline ? <time dateTime={deadline.toISOString()}>{timeLabel(deadline.toISOString())}</time> : 'Time unavailable — verify last seen'}</dd></div>
                     </dl>
                     {acks.length > 0 && <p className="small muted" data-testid="incident-responders">
                       Responding: {acks.map((a) => userName(data, a.patrollerId)).join(', ')}
@@ -103,14 +148,14 @@ function Patrol() {
           <p className="small muted">Children’s details are no longer available once a search is closed.</p>
           {closedError && <div className="banner danger" data-testid="closed-error">{closedError}</div>}
           <table>
-            <thead><tr><th>Child</th><th>Closed</th><th>Outcome</th><th>Notice to family</th></tr></thead>
+            <thead><tr><th>Child</th><th>Closed</th><th>Outcome</th><th>Notice to family</th><th>Activity</th></tr></thead>
             <tbody>
               {closed.map((e) => {
                 const c = data.children.find((x) => x.id === e.childId)!;
                 return (
                   <tr key={e.id}>
                     <td>{c.firstName} {c.lastName.charAt(0)}.</td>
-                    <td>{timeLabel(e.closedAt)}</td>
+                    <td>{recordedTime(e.closedAt)}</td>
                     <td>{e.outcome}</td>
                     <td>
                       {!e.sharedWithPoliceAt ? (
@@ -121,6 +166,7 @@ function Patrol() {
                         <button type="button" onClick={() => markNoticeMailed(e.id).then(() => setClosedError(null), (err: Error) => setClosedError(err.message))}>To mail · mark done</button>
                       )}
                     </td>
+                    <td><details><summary>Recorded activity</summary><IncidentActivity em={e} /></details></td>
                   </tr>
                 );
               })}
@@ -166,35 +212,28 @@ function SearchScreen({ em }: { em: Emergency }) {
     logAccess('Opened child details during a search', child.id);
   }, [logAccess, child.id]);
 
-  const deadline = policeDeadline(em.lastSeenAt);
-  // A report made against the real clock has to be counted against the real clock.
-  const clock = now;
-  const msLeft = deadline.getTime() - clock.getTime();
+  const deadline = incidentDeadline(em.lastSeenAt, now);
+  const msLeft = deadline ? deadline.getTime() - now.getTime() : NaN;
   const minsLeft = Math.ceil(msLeft / 60_000);
-  const minsMissing = Math.max(0, Math.floor((clock.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
+  const minsMissing = deadline ? Math.max(0, Math.floor((now.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000)) : null;
 
   return (
     <div id="patrol-incident-detail" className={styles.detail} data-testid="search-screen">
       <div className="banner danger" style={{ fontSize: '1.1rem' }}>
-        MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · missing {minsMissing} min
+        MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · {minsMissing === null ? 'last-seen time needs verification' : `missing ${minsMissing} min`}
       </div>
       {error && <div className="banner danger" data-testid="search-save-error">{error}</div>}
 
-      <section className={`card ${styles.responseControls}`} aria-label="Patrol acknowledgement">
-        <div data-testid="acks">
-          <h2>Patrol acknowledgement</h2>
-          {acks.length === 0 ? <p className="muted">No patrollers have acknowledged yet.</p> : (
-            <ul className={styles.acknowledgements}>
-              {acks.map((a) => <li key={a.patrollerId}>{userName(data, a.patrollerId)} <span className="small muted">· {timeLabel(a.at)}</span></li>)}
-            </ul>
-          )}
-        </div>
-        {!iAcked && <button className="primary" type="button" disabled={saving} onClick={() => void save(() => acknowledge(em.id))} data-testid="acknowledge">I’m on it</button>}
-      </section>
-
-      <div className={styles.detailGrid}>
-        <section className="card" aria-label="Child identification">
-          <h2>Child identification</h2>
+        <section className={`card ${styles.snapshot}`} aria-label="Safety Snapshot" data-testid="safety-snapshot">
+          <div className={styles.snapshotHeading}>
+            <div><h2>Safety Snapshot</h2><p className={styles.snapshotName}>{fullName(child)} <span className="chip">Bib {child.bib}</span></p></div>
+            <span className={`chip ${acks.length ? 'ok' : 'warn'}`} data-testid="snapshot-response-status">{acks.length ? 'Patrol acknowledged' : 'Reported · awaiting acknowledgement'}</span>
+          </div>
+          <div className={styles.lastKnown} data-testid="search-last-seen">
+            <h3>Last-known location</h3>
+            <p><strong>{em.lastSeenPlace || 'Location not recorded'}</strong></p>
+            <p className="small">Last seen: {deadline ? <time dateTime={em.lastSeenAt}>{timeLabel(em.lastSeenAt)}</time> : 'Time unavailable — verify last seen'}</p>
+          </div>
           <div className={styles.identification}>
             <div
               aria-label={consent?.photoConsent ? 'Photo' : 'No photo consent'}
@@ -211,25 +250,42 @@ function SearchScreen({ em }: { em: Emergency }) {
               <dt>Bib</dt><dd>{child.bib}</dd>
             </dl>
           </div>
-          <h3 style={{ marginTop: 14 }}>Last seen</h3>
-          <p data-testid="search-last-seen"><strong>{em.lastSeenPlace}</strong> at {timeLabel(em.lastSeenAt)}</p>
+          <p className="small muted" data-testid="snapshot-distinguishing">Distinguishing details: Not recorded in this preview.</p>
           <p className="small muted">Reported by {userName(data, em.reportedBy)}</p>
           <h3>Group</h3>
           <p data-testid="search-group">{group ? `${group.name} · instructor ${userName(data, group.instructorId)}` : 'No group'}</p>
+          <div className={styles.snapshotDeadline}>
+            <span>Escalation deadline: <strong>{deadline ? timeLabel(deadline.toISOString()) : 'Time unavailable — verify last seen'}</strong></span>
+            <span className={`chip ${!deadline || minsLeft <= 10 ? 'danger' : ''}`} data-testid="snapshot-urgency">{!deadline ? 'Verify timing now' : msLeft <= 0 ? 'Overdue · action required' : minsLeft <= 10 ? 'Urgent · action due soon' : `${minsLeft} min remaining`}</span>
+          </div>
         </section>
 
+      <section className={`card ${styles.responseControls}`} aria-label="Patrol acknowledgement">
+        <div data-testid="acks">
+          <h2>Patrol acknowledgement</h2>
+          {acks.length === 0 ? <p className="muted">No patrollers have acknowledged yet.</p> : (
+            <ul className={styles.acknowledgements}>
+              {acks.map((a) => <li key={a.patrollerId}>{userName(data, a.patrollerId)} <span className="small muted">· {recordedTime(a.at)}</span></li>)}
+            </ul>
+          )}
+        </div>
+        {!iAcked && <button className="primary" type="button" disabled={saving} onClick={() => void save(() => acknowledge(em.id))} data-testid="acknowledge">I’m on it</button>}
+      </section>
+
+      <div className={styles.detailGrid}>
         <section className="card" data-testid="search-countdown">
           <h2>Escalation</h2>
-          <h3>Call police by {deadline.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</h3>
-          <div className="big-number" style={{ color: minsLeft <= 10 ? 'var(--danger)' : undefined }}>
-            {msLeft > 0 ? `${minsLeft} min left` : 'Call police now'}
+          <h3>{deadline ? `Call police by ${timeLabel(deadline.toISOString())}` : 'Time unavailable — verify last seen'}</h3>
+          <div className="big-number" role="timer" aria-label="Time to escalation deadline" data-testid="escalation-timer" style={{ color: minsLeft <= 10 ? 'var(--danger)' : undefined }}>
+            {!deadline ? 'Verify escalation timing now' : msLeft > 0 ? `${countdown(msLeft)} remaining` : `Overdue by ${countdown(msLeft)}`}
           </div>
+          {deadline && msLeft <= 0 && <p className="field-error">Call police now and contact the family. These are human actions; the app does not make calls.</p>}
           <p className="small muted">60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
           {!em.sharedWithPoliceAt ? (
             <button type="button" disabled={saving} onClick={() => void save(() => shareWithPolice(em.id))} data-testid="share-police">Record: details shared with police</button>
           ) : (
             <div className="stack">
-              <div className="banner warn" data-testid="police-shared">Shared with police at {timeLabel(em.sharedWithPoliceAt)}</div>
+              <div className="banner warn" data-testid="police-shared">Shared with police at {recordedTime(em.sharedWithPoliceAt)}</div>
               {!em.noticeMailed ? (
                 <div className="row between card" style={{ margin: 0 }} data-testid="notice-todo">
                   <span>Mail a notice to the family (privacy law)</span>
@@ -269,6 +325,12 @@ function SearchScreen({ em }: { em: Emergency }) {
           <p className="small">{adults.filter((x) => x.link.canPickUp && !x.link.contactOrder).map((x) => `${x.person.name} (${x.link.relationship})`).join(', ') || 'No one else'}</p>
         </section>
       </div>
+
+      <section className="card" aria-label="Incident activity">
+        <h2>Recorded activity</h2>
+        <p className="small muted">Recorded events only. Acknowledgement does not confirm notification delivery or when a search started.</p>
+        <IncidentActivity em={em} />
+      </section>
 
       <section className="card" aria-label="Search resolution">
         <h2>Resolve search</h2>
