@@ -147,7 +147,12 @@ export async function createAccount(raw: Record<string, unknown>, request: Reque
     }),
   );
   cachedDirectory = null;
-  await emailCreatePassword(created, request);
+  try {
+    await emailCreatePassword(created, request);
+  } catch (err) {
+    console.error('[accounts] create-password email failed', err instanceof Error ? err.message : '');
+    throw new Refused('The account was created, but its email couldn’t be sent. Reload this page and use Resend email.', 502);
+  }
   return created;
 }
 

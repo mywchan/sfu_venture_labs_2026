@@ -107,8 +107,10 @@ export async function changeRoster(user: User, raw: Record<string, unknown>) {
     const instructorId = raw.instructorId;
     if (!name || name.length > 60) throw new Refused('Please give the group a name.', 422);
     if (typeof level !== 'number' || !Number.isInteger(level) || level < 1 || level > 6) throw new Refused('Please choose a level from 1 to 6.', 422);
-    if (typeof instructorId !== 'string' || !roster.users.some((u) => u.id === instructorId && u.role === 'instructor')) throw new Refused('Please choose an instructor.', 422);
-    const instructor = roster.users.find((u) => u.id === instructorId)!;
+    // The made-up instructors stay choosable while their sample groups exist.
+    const instructor = [...roster.users, ...seedData.users].find((u) => u.id === instructorId && u.role === 'instructor');
+    if (!instructor) throw new Refused('Please choose an instructor.', 422);
+    if (typeof instructorId !== 'string') throw new Refused('Please choose an instructor.', 422);
     if (groupForInstructor(roster, instructor).group) throw new Refused(`${instructor.name} already has a group today. An instructor teaches one group at a time.`);
     const created = await group.create({ title: name, data: { lessonDayId: TODAY_LESSON_DAY, name, level, instructorId } });
     await quietly(() =>
