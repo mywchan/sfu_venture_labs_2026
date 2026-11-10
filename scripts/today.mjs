@@ -12,8 +12,10 @@ const t = { type: 'text' };
 const required = { type: 'text', required: true };
 
 // Keep these fields in step with lib/server/today.ts.
-const { kk_attendance: attendance, kk_pickup_refusal: refusal, kk_emergency: emergency, kk_patrol_ack: ack, kk_notification: notification } = await piezas.defineEntities(
+const { kk_attendance: attendance, kk_pickup_refusal: refusal, kk_emergency: emergency, kk_patrol_ack: ack, kk_notification: notification, kk_group: group, kk_group_placement: placement } = await piezas.defineEntities(
   {
+    kk_group: { fields: { lessonDayId: required, name: required, level: { type: 'integer', required: true }, instructorId: required } },
+    kk_group_placement: { fields: { lessonDayId: required, childId: required, groupId: required } },
     kk_notification: {
       fields: { recipientId: required, kind: required, message: required, href: required, actionLabel: required, dedupeKey: required, urgent: { type: 'boolean' }, refId: t, readAt: t },
     },
@@ -48,7 +50,7 @@ const emergencyIds = new Set(emergencyRows.map((e) => e.id));
 const dayAcks = ackRows.filter((a) => emergencyIds.has(a.data.emergencyId));
 
 if (reset) {
-  for (const [entity, rows] of [[attendance, attendanceRows], [refusal, refusalRows], [ack, dayAcks], [emergency, emergencyRows], [notification, notificationRows]]) {
+  for (const [entity, rows] of [[group, await listAll(group, day)], [placement, await listAll(placement, day)], [attendance, attendanceRows], [refusal, refusalRows], [ack, dayAcks], [emergency, emergencyRows], [notification, notificationRows]]) {
     for (const row of rows) await entity.delete(row.id);
   }
   console.log(`\nCleared the preview day: ${attendanceRows.length} check-ins, ${refusalRows.length} refused pickups, ${emergencyRows.length} searches, ${dayAcks.length} acknowledgements, ${notificationRows.length} notifications.\n`);

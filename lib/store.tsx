@@ -15,6 +15,8 @@ import {
   type ConsentForm,
   type Data,
   type Emergency,
+  type Group,
+  type GroupMember,
   type MedicalAlert,
   type PatrolAck,
   type Person,
@@ -30,8 +32,8 @@ type Store = {
   data: Data;
   me: User | null;
   now: Date;
-  signIn: (userId: string) => void;
-  signOut: () => void;
+  refreshSession: () => Promise<{ user: User | null; problem: string | null }>; // asks the server who is signed in
+  signOut: () => Promise<void>;
   // parent
   guardianLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for adults?
   sessionChecked: boolean; // false until we've looked up who is signed in
@@ -59,8 +61,8 @@ type Store = {
   closeSearch: (emergencyId: string, outcome: string) => Promise<void>;
   // admin
   updateChild: (childId: string, patch: Partial<Data['children'][number]>) => void;
-  addGroup: (name: string, level: number, instructorId: string) => void;
-  moveChild: (childId: string, groupId: string | null) => void;
+  addGroup: (name: string, level: number, instructorId: string) => Promise<void>;
+  moveChild: (childId: string, groupId: string | null) => Promise<void>;
   importRows: (rows: ImportRow[]) => { added: number; updated: number };
 };
 
@@ -110,6 +112,9 @@ function applyGuardians(d: Data, rows: GuardianRow[], childIds: Set<string>): Da
   };
 }
 
+// Today's groups, saved ones included (see lib/server/roster.ts).
+type RosterRows = { groups: Group[]; groupMembers: GroupMember[] };
+
 // What the server sends back for today (see lib/server/today.ts).
 type TodayRows = { attendance: Attendance[]; refusals: PickupRefusal[]; emergencies: Emergency[]; acks: PatrolAck[] };
 
@@ -156,15 +161,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, []);
 
-  // Remember who is signed in across page changes within this tab.
-  useEffect(() => {
+  /** Asks the server who is signed in; the session itself stays in a cookie the page can't read. */
+  const refreshSession = useCallback(async (): Promise<{ user: User | null; problem: string | null }> => {
     try {
-      const saved = sessionStorage.getItem('kk-preview-user');
-      if (saved) setMeId(saved);
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (!res.ok) {
+        setMeId(null);
+        const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+        return { user: null, problem: res.status === 401 ? 'We couldn’t finish signing you in. Please try again.' : (error ?? 'Couldn’t reach Peak Pals. Please try again.') };
+      }
+      const body = (await res.json()) as { me: User; people: User[]; parentAccounts: Data['parentAccounts'] };
+      const known = new Set([body.me.id, ...body.people.map((u) => u.id)]);
+      setData((d) => ({
+        ...d,
+        users: [...d.users.filter((u) => !known.has(u.id)), body.me, ...body.people],
+        parentAccounts: [...d.parentAccounts.filter((p) => p.userId !== body.me.id), ...body.parentAccounts],
+      }));
+      setMeId(body.me.id);
+      return { user: body.me, problem: null };
     } catch {
-      /* storage unavailable: stay signed out */
+      setMeId(null);
+      return { user: null, problem: 'Couldn’t reach Peak Pals. Please try again.' };
+    } finally {
+      setSessionChecked(true);
     }
-    setSessionChecked(true);
+  }, []);
+
+  useEffect(() => {
+    void refreshSession();
+  }, [refreshSession]);
+
+  /** Leaves no one's saved information on screen for the next person. */
+  const endSession = useCallback(() => {
+    setMeId(null);
+    setData(seedData);
   }, []);
 
   const me = data.users.find((u) => u.id === meId) ?? null;
@@ -184,7 +214,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let stopped = false;
     const load = async () => {
       try {
-        const res = await fetch(`/api/guardians?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        const res = await fetch('/api/guardians', { cache: 'no-store' });
+        if (res.status === 401) return endSession();
         if (!res.ok) throw new Error(String(res.status));
         const { guardians } = (await res.json()) as { guardians: GuardianRow[] };
         if (stopped) return;
@@ -212,7 +243,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const load = async () => {
       const startedAt = saves.current;
       try {
-        const res = await fetch(`/api/today?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        const res = await fetch('/api/today', { cache: 'no-store' });
+        if (res.status === 401) return endSession();
         if (!res.ok) throw new Error(String(res.status));
         const { today } = (await res.json()) as { today: TodayRows };
         if (stopped || saves.current !== startedAt) return;
@@ -230,6 +262,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [meId, staff]);
 
+  // Groups come from Peak Pals too, so an assignment reaches the instructor.
+  useEffect(() => {
+    if (!meId) return;
+    let stopped = false;
+    const load = async () => {
+      const startedAt = saves.current;
+      try {
+        const res = await fetch('/api/groups', { cache: 'no-store' });
+        if (res.status === 401) return endSession();
+        if (!res.ok) return;
+        const roster = (await res.json()) as RosterRows;
+        if (!stopped && saves.current === startedAt) setData((d) => ({ ...d, ...roster }));
+      } catch {
+        /* the "can't reach Peak Pals" banner already covers this */
+      }
+    };
+    void load();
+    const t = setInterval(load, staff ? 5_000 : 30_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId, staff]);
+
+  /** Saves a group change. The screen only changes once it's saved. */
+  const sendGroups = useCallback(async (action: Record<string, unknown>) => {
+    saves.current += 1;
+    try {
+      const res = await fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
+      const body = (await res.json().catch(() => ({}))) as Partial<RosterRows> & { error?: string };
+      if (!res.ok || !body.groups || !body.groupMembers) throw new Error(body.error ?? 'That didn’t save. Please try again.');
+      const roster = { groups: body.groups, groupMembers: body.groupMembers };
+      setData((d) => ({ ...d, ...roster }));
+    } finally {
+      saves.current += 1;
+    }
+  }, []);
+
   // Notifications come from Peak Pals on the same 5-second beat as today's records.
   useEffect(() => {
     setNotifications([]);
@@ -238,7 +308,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const load = async () => {
       const startedAt = notificationSaves.current;
       try {
-        const res = await fetch(`/api/notifications?as=${encodeURIComponent(meId)}`, { cache: 'no-store' });
+        const res = await fetch('/api/notifications', { cache: 'no-store' });
+        if (res.status === 401) return endSession();
         if (!res.ok) return;
         const body = (await res.json()) as { notifications: AppNotification[] };
         if (!stopped && notificationSaves.current === startedAt) setNotifications(body.notifications);
@@ -262,7 +333,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const stamp = new Date().toISOString();
       setNotifications((list) => list.map((n) => (ids.includes(n.id) ? { ...n, readAt: stamp } : n)));
       try {
-        await fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ as: meId, ids }) });
+        await fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
       } finally {
         notificationSaves.current += 1;
       }
@@ -271,12 +342,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   /** Sends one action to Peak Pals. The screen only changes once it's saved. */
-  const sendToday = useCallback(async (asUserId: string, action: Record<string, unknown>) => {
+  const sendToday = useCallback(async (action: Record<string, unknown>) => {
     saves.current += 1;
     try {
       let res: Response;
       try {
-        res = await fetch('/api/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ as: asUserId, ...action }) });
+        res = await fetch('/api/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
       } catch {
         setLiveLink('offline');
         throw new Error('Couldn’t reach Peak Pals, so that was not saved.');
@@ -292,17 +363,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Sends only the adults that changed, so this save can't undo another parent's. */
-  const pushGuardians = useCallback(async (before: Data, next: Data, childId: string, asUserId: string, removedLinkIds: string[] = []) => {
+  const pushGuardians = useCallback(async (before: Data, next: Data, childId: string, removedLinkIds: string[] = []) => {
     const previous = new Map(guardianRows(before, childId).map((r) => [r.linkId, JSON.stringify(r)]));
     // Adults still only on the made-up list have to go up too, or they'd vanish.
     const guardians = guardianRows(next, childId).filter((r) => !PIEZAS_RECORD_ID.test(r.linkId) || previous.get(r.linkId) !== JSON.stringify(r));
     const res = await fetch('/api/guardians', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ as: asUserId, childId, guardians, removedLinkIds }),
+      body: JSON.stringify({ childId, guardians, removedLinkIds }),
     });
-    if (res.status === 404) throw new Error('Saving is only switched on for local testing until real sign-in is ready.');
-    const body = (await res.json().catch(() => ({}))) as { guardians?: GuardianRow[]; error?: string };
+        const body = (await res.json().catch(() => ({}))) as { guardians?: GuardianRow[]; error?: string };
     if (!res.ok || !body.guardians) throw new Error(body.error ?? 'That didn’t save. Please try again.');
     const saved = body.guardians;
     setData((d) => applyGuardians(d, saved, new Set([childId])));
@@ -321,21 +391,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data,
       me,
       now,
-      signIn: (id) => {
-        setMeId(id);
-        try {
-          sessionStorage.setItem('kk-preview-user', id);
-        } catch {
-          /* ignore */
-        }
-      },
-      signOut: () => {
-        setMeId(null);
-        try {
-          sessionStorage.removeItem('kk-preview-user');
-        } catch {
-          /* ignore */
-        }
+      refreshSession,
+      signOut: async () => {
+        await fetch('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined);
+        endSession();
       },
       guardianLink,
       sessionChecked,
@@ -349,13 +408,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const rowId = linkId ?? newId('cp');
         const row: ChildPerson = { id: rowId, childId, personId: person.id, ...link };
         const links = linkId ? data.childPersons.map((cp) => (cp.id === linkId ? row : cp)) : [...data.childPersons, row];
-        await pushGuardians(data, { ...data, persons, childPersons: renumberContacts(links, childId, rowId, link.contactOrder) }, childId, userId);
+        await pushGuardians(data, { ...data, persons, childPersons: renumberContacts(links, childId, rowId, link.contactOrder) }, childId);
       },
       removeLink: async (linkId) => {
         const childId = data.childPersons.find((cp) => cp.id === linkId)?.childId;
         if (!childId) return;
         const rest = data.childPersons.filter((cp) => cp.id !== linkId);
-        await pushGuardians(data, { ...data, childPersons: renumberContacts(rest, childId) }, childId, userId, [linkId]);
+        await pushGuardians(data, { ...data, childPersons: renumberContacts(rest, childId) }, childId, [linkId]);
       },
       saveMedical: (alert, id) =>
         update((d) => ({
@@ -368,29 +427,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
       signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
-      fixClothing: (childId, clothing) => sendToday(userId, { action: 'fixClothing', childId, ...clothing }),
-      checkIn: (childId, clothing) => sendToday(userId, { action: 'checkIn', childId, ...clothing }),
-      release: (childId, personId) => sendToday(userId, { action: 'release', childId, personId }),
-      refusePickup: (childId, nameGiven) => sendToday(userId, { action: 'refusePickup', childId, nameGiven }),
-      reportMissing: (childId, lastSeenPlace, lastSeenTime) => sendToday(userId, { action: 'reportMissing', childId, lastSeenPlace, lastSeenTime }),
-      acknowledge: (emergencyId) => sendToday(userId, { action: 'acknowledge', emergencyId }),
+      fixClothing: (childId, clothing) => sendToday({ action: 'fixClothing', childId, ...clothing }),
+      checkIn: (childId, clothing) => sendToday({ action: 'checkIn', childId, ...clothing }),
+      release: (childId, personId) => sendToday({ action: 'release', childId, personId }),
+      refusePickup: (childId, nameGiven) => sendToday({ action: 'refusePickup', childId, nameGiven }),
+      reportMissing: (childId, lastSeenPlace, lastSeenTime) => sendToday({ action: 'reportMissing', childId, lastSeenPlace, lastSeenTime }),
+      acknowledge: (emergencyId) => sendToday({ action: 'acknowledge', emergencyId }),
       shareWithPolice: async (emergencyId) => {
-        await sendToday(userId, { action: 'shareWithPolice', emergencyId });
+        await sendToday({ action: 'shareWithPolice', emergencyId });
         const childId = data.emergencies.find((e) => e.id === emergencyId)?.childId;
         if (childId) update((d) => record(d, 'Shared details with police', childId));
       },
-      markNoticeMailed: (emergencyId) => sendToday(userId, { action: 'markNoticeMailed', emergencyId }),
-      closeSearch: (emergencyId, outcome) => sendToday(userId, { action: 'closeSearch', emergencyId, outcome }),
+      markNoticeMailed: (emergencyId) => sendToday({ action: 'markNoticeMailed', emergencyId }),
+      closeSearch: (emergencyId, outcome) => sendToday({ action: 'closeSearch', emergencyId, outcome }),
       updateChild: (childId, patch) =>
         update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, ...patch } : c)) })),
-      addGroup: (name, level, instructorId) =>
-        update((d) => ({ ...d, groups: [...d.groups, { id: newId('g'), lessonDayId: TODAY_LESSON_DAY, name, level, instructorId }] })),
-      moveChild: (childId, groupId) =>
-        update((d) => {
-          const todayGroupIds = new Set(d.groups.filter((g) => g.lessonDayId === TODAY_LESSON_DAY).map((g) => g.id));
-          const rest = d.groupMembers.filter((m) => !(m.childId === childId && todayGroupIds.has(m.groupId)));
-          return { ...d, groupMembers: groupId ? [...rest, { groupId, childId }] : rest };
-        }),
+      addGroup: (name, level, instructorId) => sendGroups({ action: 'addGroup', name, level, instructorId }),
+      moveChild: (childId, groupId) => sendGroups({ action: 'moveChild', childId, groupId }),
       importRows: (rows) => {
         // Matched on the store's order number: existing children are updated, never duplicated.
         const known = new Set(data.children.map((c) => c.orderNumber));
@@ -407,7 +460,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday, sendGroups, refreshSession, endSession]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

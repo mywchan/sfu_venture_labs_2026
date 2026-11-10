@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AccountsTab } from '@/components/AccountsTab';
 import { ReportMissing } from '@/components/ReportMissing';
 import { ROLE_LABEL, Shell } from '@/components/Shell';
 import { ageOn, fullName, groupOfChild, missingInfo, openSearchFor, timeLabel, todayLabel, todaysAttendance, userName } from '@/lib/access';
@@ -15,7 +16,7 @@ export default function AdminHome() {
   );
 }
 
-type Tab = 'missing' | 'groups' | 'children' | 'access' | 'upload';
+type Tab = 'missing' | 'groups' | 'children' | 'accounts' | 'access' | 'upload';
 
 function Admin() {
   const [tab, setTab] = useState<Tab>('missing');
@@ -23,6 +24,7 @@ function Admin() {
     ['missing', 'Missing information'],
     ['groups', 'Groups'],
     ['children', 'Children'],
+    ['accounts', 'Accounts'],
     ['access', 'Access record'],
     ['upload', 'Store spreadsheet'],
   ];
@@ -37,6 +39,7 @@ function Admin() {
       {tab === 'missing' && <MissingTab />}
       {tab === 'groups' && <GroupsTab />}
       {tab === 'children' && <ChildrenTab />}
+      {tab === 'accounts' && <AccountsTab />}
       {tab === 'access' && <AccessTab />}
       {tab === 'upload' && <UploadTab />}
     </>
@@ -81,7 +84,7 @@ function GroupsTab() {
   const [instructorId, setInstructorId] = useState(instructors[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  const tryMove = (childId: string, groupId: string) => {
+  const tryMove = async (childId: string, groupId: string) => {
     if (groupId) {
       const size = data.groupMembers.filter((m) => m.groupId === groupId && m.childId !== childId).length;
       if (size >= MAX_GROUP) {
@@ -90,7 +93,11 @@ function GroupsTab() {
       }
     }
     setError(null);
-    moveChild(childId, groupId || null);
+    try {
+      await moveChild(childId, groupId || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That didn’t save.');
+    }
   };
 
   return (
@@ -110,7 +117,7 @@ function GroupsTab() {
               {kids.map((c) => (
                 <div key={c.id} className="row between small" style={{ padding: '4px 0', borderTop: '1px solid var(--line)' }}>
                   <span>{fullName(c)} <span className="muted">L{c.level}</span></span>
-                  <select style={{ width: 'auto', minHeight: 32, padding: '4px 6px' }} value={g.id} onChange={(e) => tryMove(c.id, e.target.value)} aria-label={`Move ${fullName(c)}`}>
+                  <select style={{ width: 'auto', minHeight: 32, padding: '4px 6px' }} value={g.id} onChange={(e) => void tryMove(c.id, e.target.value)} aria-label={`Move ${fullName(c)}`} data-testid={`move-${c.id}`}>
                     {groups.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                     <option value="">Remove from group</option>
                   </select>
@@ -126,7 +133,7 @@ function GroupsTab() {
         {unplaced.map((c) => (
           <div key={c.id} className="row between small" style={{ padding: '4px 0' }}>
             <span>{fullName(c)} <span className="muted">L{c.level}</span></span>
-            <select style={{ width: 'auto', minHeight: 32, padding: '4px 6px' }} value="" onChange={(e) => tryMove(c.id, e.target.value)} aria-label={`Place ${fullName(c)}`} data-testid={`place-${c.id}`}>
+            <select style={{ width: 'auto', minHeight: 32, padding: '4px 6px' }} value="" onChange={(e) => void tryMove(c.id, e.target.value)} aria-label={`Place ${fullName(c)}`} data-testid={`place-${c.id}`}>
               <option value="">Place in…</option>
               {groups.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </select>
@@ -135,7 +142,7 @@ function GroupsTab() {
       </section>
       <form
         className="card"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim()) return;
           if (groups.some((g) => g.instructorId === instructorId)) {
@@ -143,8 +150,12 @@ function GroupsTab() {
             return;
           }
           setError(null);
-          addGroup(name.trim(), level, instructorId);
-          setName('');
+          try {
+            await addGroup(name.trim(), level, instructorId);
+            setName('');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'That didn’t save.');
+          }
         }}
         data-testid="new-group-form"
       >
@@ -157,7 +168,7 @@ function GroupsTab() {
           </div>
           <div className="field">
             <label htmlFor="g-inst">Instructor</label>
-            <select id="g-inst" value={instructorId} onChange={(e) => setInstructorId(e.target.value)}>{instructors.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
+            <select id="g-inst" value={instructorId} onChange={(e) => setInstructorId(e.target.value)} data-testid="new-group-instructor">{instructors.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
           </div>
         </div>
         <button className="primary" type="submit" data-testid="new-group-save">Create group</button>

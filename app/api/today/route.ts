@@ -1,4 +1,4 @@
-import { localOnly, notFound, previewCaller } from '@/lib/server/preview-caller';
+import { requireUser } from '@/lib/server/auth/current-user';
 import { perform, readToday, Refused } from '@/lib/server/today';
 
 export const runtime = 'nodejs';
@@ -12,9 +12,9 @@ function failed(err: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (localOnly()) return notFound();
-  const user = previewCaller(new URL(request.url).searchParams.get('as'));
-  if (!user) return Response.json({ error: 'Not signed in' }, { status: 401 });
+  const auth = await requireUser(request);
+  if ('response' in auth) return auth.response;
+  const user = auth.user;
   try {
     return Response.json({ today: await readToday(user) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
@@ -23,15 +23,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (localOnly()) return notFound();
+  const auth = await requireUser(request);
+  if ('response' in auth) return auth.response;
+  const user = auth.user;
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: 'That request could not be read.' }, { status: 400 });
   }
-  const user = previewCaller(body?.as);
-  if (!user) return Response.json({ error: 'Not signed in' }, { status: 401 });
   try {
     return Response.json({ today: await perform(user, body) });
   } catch (err) {
