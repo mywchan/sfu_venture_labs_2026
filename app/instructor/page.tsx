@@ -23,13 +23,22 @@ function MyGroup() {
   const [detail, setDetail] = useState<{ child: Child; alert: MedicalAlert } | null>(null);
   const [missing, setMissing] = useState<Child | null>(null);
   const [fixing, setFixing] = useState<Child | null>(null);
-  const { copy, save, remove } = useOfflineCopy(me!);
+  const { copy, save, remove, error, checked } = useOfflineCopy(me!);
   const online = useOnline();
   const [viewingCopy, setViewingCopy] = useState(false);
 
   // With no connection, the saved copy is all there is.
   if (copy && (!online || viewingCopy)) {
     return <OfflineCopyView copy={copy} online={online} onBack={() => setViewingCopy(false)} />;
+  }
+
+  if (!online) {
+    return <section className="card" data-testid="offline-unavailable" aria-labelledby="offline-unavailable-title">
+      <h1 id="offline-unavailable-title">{checked ? 'No valid saved group available' : 'Checking saved group…'}</h1>
+      <p role="status">You are offline. The normal roster and reporting controls are unavailable. Use your radio or the established emergency procedure for a missing child.</p>
+      {error && <p className="field-error" role="alert">{error}</p>}
+      <p className="small muted">Reconnect, then save a valid group copy. Reopening the app offline is not supported.</p>
+    </section>;
   }
 
   if (!group) {
@@ -45,7 +54,7 @@ function MyGroup() {
     <>
       <h1 data-testid="group-title">{group.name} · Level {group.level}</h1>
       <p className="muted">{kids.length} children today. Tap an alert for details.</p>
-      <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} />
+      <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} error={error} />
       <div data-testid="group-list">
         {kids.map((c) => {
           const alerts = data.medical.filter((m) => m.childId === c.id);

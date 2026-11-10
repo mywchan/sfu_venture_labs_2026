@@ -22,6 +22,133 @@ async function reportMissing(page: Page, child: string) {
   await page.getByRole('button', { name: 'OK', exact: true }).click();
 }
 
+async function openInstructor(page: Page) {
+  await page.goto('/');
+  await page.getByTestId('demo-u-sam').click();
+  await expect(page.getByTestId('offline-card')).toBeVisible();
+}
+
+test('confirmed browser snapshot contains only the minimal roster and works on connection loss', async ({ page, context }) => {
+  await openInstructor(page);
+  await page.getByTestId('offline-save').click();
+  await expect(page.getByTestId('offline-card')).toContainText('Saved to this browser');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('kk-offline-u-sam')!));
+  expect(saved.instructorId).toBe('u-sam');
+  expect(saved.groupId).toBe('g-a');
+  expect(saved.kids).toHaveLength(5);
+  expect(Object.keys(saved).sort()).toEqual(['instructorId', 'groupId', 'lessonDayId', 'savedAt', 'expiresAt', 'groupName', 'level', 'kids'].sort());
+  for (const kid of saved.kids) {
+    expect(Object.keys(kid).sort()).toEqual(['name', 'bib', 'age', 'clothing', 'alerts'].sort());
+    for (const alert of kid.alerts) expect(Object.keys(alert).sort()).toEqual(['shortAlert', 'severity', 'medicationLocation'].sort());
+  }
+  await context.setOffline(true);
+  await expect(page.getByTestId('offline-copy')).toBeVisible();
+  await expect(page.getByTestId('offline-copy').locator('[data-testid^="offline-child-"]')).toHaveCount(5);
+  await expect(page.getByTestId('offline-copy')).toContainText('Ava Moreau');
+  await expect(page.getByTestId('offline-copy')).toContainText('Purple jacket');
+  await expect(page.getByTestId('offline-copy')).toContainText('use your radio');
+  await expect(page.getByTestId('group-list')).toHaveCount(0);
+  await expect(page.getByTestId('medical-detail')).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.getByTestId('offline-card')).toBeVisible();
+  await page.getByTestId('offline-delete').click();
+  expect(await page.evaluate(() => localStorage.getItem('kk-offline-u-sam'))).toBeNull();
+});
+
+for (const failure of ['throws', 'silently ignores'] as const) {
+  test(`storage that ${failure} a snapshot write never claims offline availability`, async ({ page, context }) => {
+    await openInstructor(page);
+    await page.evaluate((mode) => {
+      Storage.prototype.setItem = function () {
+        if (mode === 'throws') throw new DOMException('Synthetic storage failure', 'QuotaExceededError');
+      };
+    }, failure);
+    await page.getByTestId('offline-save').click();
+    await expect(page.getByTestId('offline-error')).toContainText('Could not save to this browser');
+    await expect(page.getByTestId('offline-card')).not.toContainText('Saved to this browser');
+    await expect(page.getByTestId('offline-view')).toHaveCount(0);
+    await context.setOffline(true);
+    await expect(page.getByTestId('offline-unavailable')).toContainText('No valid saved group available');
+    await expect(page.getByTestId('group-list')).toHaveCount(0);
+  });
+}
+
+for (const corruption of ['bad JSON', 'invalid shape', 'expired', 'future saved time', 'wrong instructor', 'wrong group', 'wrong roster', 'private extra field'] as const) {
+  test(`cached snapshot is rejected safely: ${corruption}`, async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await openInstructor(page);
+    await page.getByTestId('offline-save').click();
+    await expect(page.getByTestId('offline-view')).toBeVisible();
+    await page.evaluate((mode) => {
+      const key = 'kk-offline-u-sam';
+      const cached = JSON.parse(localStorage.getItem(key)!);
+      if (mode === 'bad JSON') { localStorage.setItem(key, '{broken'); return; }
+      if (mode === 'invalid shape') { localStorage.setItem(key, JSON.stringify({ kids: 'not an array' })); return; }
+      if (mode === 'expired') cached.expiresAt = cached.expiresAt.replace('16:00:00', '12:00:00');
+      if (mode === 'future saved time') cached.savedAt = cached.savedAt.replace(/T.*/, 'T23:59:00');
+      if (mode === 'wrong instructor') cached.instructorId = 'u-priya';
+      if (mode === 'wrong group') cached.groupId = 'g-b';
+      if (mode === 'wrong roster') cached.kids[0].name = 'Unassigned fictional child';
+      if (mode === 'private extra field') cached.kids[0].contacts = [{ name: 'Excluded contact' }];
+      localStorage.setItem(key, JSON.stringify(cached));
+    }, corruption);
+    await switchRole(page, 'u-sam');
+    await expect(page.getByTestId('offline-error')).toContainText('could not be read or validated');
+    await expect(page.getByTestId('offline-view')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kk-offline-u-sam'))).toBeNull();
+    await context.setOffline(true);
+    await expect(page.getByTestId('offline-unavailable')).toBeVisible();
+    await expect(page.getByTestId('offline-copy')).toHaveCount(0);
+    await expect(page.getByTestId('group-list')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('a saved snapshot expires on the existing preview clock while the screen is open', async ({ page, context }) => {
+  await page.clock.install();
+  await openInstructor(page);
+  await page.getByTestId('offline-save').click();
+  await expect(page.getByTestId('offline-view')).toBeVisible();
+  await context.setOffline(true);
+  await expect(page.getByTestId('offline-copy')).toBeVisible();
+  await page.clock.fastForward(3 * 60 * 60 * 1000);
+  await expect(page.getByTestId('offline-unavailable')).toBeVisible();
+  await expect(page.getByTestId('offline-copy')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('kk-offline-u-sam'))).toBeNull();
+});
+
+test('offline without a snapshot never falls through to the normal instructor roster', async ({ page, context }) => {
+  await openInstructor(page);
+  await context.setOffline(true);
+  await expect(page.getByTestId('offline-unavailable')).toContainText('Use your radio');
+  await expect(page.getByTestId('group-list')).toHaveCount(0);
+  await expect(page.getByTestId('report-missing-c-ava')).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.getByTestId('group-list')).toBeVisible();
+});
+
+test('report opened before connection loss is blocked and never queued or delivered', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByTestId('demo-u-mei').click();
+  await page.getByTestId('desk-result-c-ava').click();
+  await page.getByTestId('desk-report-missing').click();
+  await page.getByTestId('report-missing-place').fill('Pigeon chair');
+  await page.getByTestId('report-missing-time').fill('13:30');
+  await context.setOffline(true);
+  await expect(page.getByTestId('report-missing-offline')).toContainText('No report can be sent or queued');
+  await expect(page.getByTestId('report-missing-offline')).toContainText('Use your radio');
+  await expect(page.getByTestId('report-missing-send')).toBeDisabled();
+  // Exercise the submit guard as well as the disabled button.
+  await page.getByTestId('report-missing-sheet').locator('form').evaluate(form => (form as HTMLFormElement).requestSubmit());
+  await expect(page.getByTestId('report-missing-sent')).toHaveCount(0);
+  await context.setOffline(false);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByTestId('desk-incident-status')).toHaveCount(0);
+  await switchRole(page, 'u-rob');
+  await expect(page.getByTestId('no-searches')).toBeVisible();
+});
+
 test('reception keeps contacts and blocks pickup until closure, with truthful acknowledgement status', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('demo-u-sam').click();

@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { fullName, openSearchFor } from '@/lib/access';
 import type { Child } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
+import { useOnline } from '@/components/OfflineCopy';
 
 /** One-step "report missing" sheet, used by instructors, the desk and the administrator. */
 export function ReportMissing({ child, onClose }: { child: Child; onClose: () => void }) {
   const { now, reportMissing, data } = useStore();
+  const online = useOnline();
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
   const [place, setPlace] = useState('');
@@ -19,6 +21,7 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="rm-title" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()} data-testid="report-missing-sheet">
+        {!online && <p className="banner danger" role="alert" data-testid="report-missing-offline">You are offline. No report can be sent or queued. Use your radio or the established emergency procedure now.</p>}
         {done || already ? (
           <>
             <h2 id="rm-title">Missing-child report</h2>
@@ -31,6 +34,7 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
+              if (!online || !navigator.onLine) return;
               const next: typeof errors = {};
               if (!place.trim()) next.place = 'Enter where the child was last seen.';
               if (!time) next.time = 'Enter the last-seen time.';
@@ -60,7 +64,7 @@ export function ReportMissing({ child, onClose }: { child: Child; onClose: () =>
               <div id="rm-time-hint" className="small muted">Use today's preview time, shown in the header.</div>
               {errors.time && <div id="rm-time-error" className="field-error" role="alert" data-testid="report-missing-time-error">{errors.time}</div>}
             </div>
-            <button className="big danger" type="submit" data-testid="report-missing-send">Record missing-child report</button>
+            <button className="big danger" type="submit" disabled={!online} data-testid="report-missing-send">Record missing-child report</button>
             <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
           </form>
         )}
