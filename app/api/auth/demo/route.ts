@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   if (!demoMode()) return Response.json({ error: 'Not found' }, { status: 404 });
   if (!fromThisSite(request)) return notFromThisSite();
+  // Other people on the same wifi must not be able to open these accounts.
+  if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(request.headers.get('host') ?? '')) return Response.json({ error: 'Not found' }, { status: 404 });
   const body = (await request.json().catch(() => ({}))) as { userId?: unknown };
   const user = seedData.users.find((u) => u.id === body.userId);
   if (!user) return Response.json({ error: 'That account doesn’t exist.' }, { status: 404 });
