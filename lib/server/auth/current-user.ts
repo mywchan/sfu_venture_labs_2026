@@ -6,7 +6,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { User } from '@/lib/seed/data';
-import type { VerifySessionResult } from '@piezas/sdk';
+import { PiezasError, type VerifySessionResult } from '@piezas/sdk';
 import { accountsFor, directory, roleAssignments } from '../accounts';
 import type { IdentityScope } from '../piezas/client';
 import { piezasServer } from '../piezas/settings';
@@ -42,6 +42,8 @@ export function forgetSession(token: string) {
   remembered.delete(fingerprint(token));
 }
 
+const filled = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+
 /** Logs which check would fail, by name only, so a rejected sign-in can be diagnosed. */
 function explainRejection(result: VerifySessionResult, scope: IdentityScope, now: number) {
   const { user, claims } = result;
@@ -52,6 +54,13 @@ function explainRejection(result: VerifySessionResult, scope: IdentityScope, now
     claims?.tenantId !== scope.tenantId && 'different organization',
     claims && claims.iat > now && 'issued in the future',
     claims && claims.exp <= now && 'expired',
+    claims && claims.sub !== user?.id && 'session is for a different person',
+    claims && claims.exp <= claims.iat && 'expiry before issue',
+    ...(['iss', 'aud', 'jti'] as const).filter((f) => !filled(claims?.[f])).map((f) => `missing ${f}`),
+    ...(['iat', 'exp'] as const).filter((f) => !Number.isSafeInteger(claims?.[f])).map((f) => `${f} is ${typeof claims?.[f]}, not a whole number`),
+    ...(['id', 'email', 'createdAt'] as const).filter((f) => !filled(user?.[f])).map((f) => `missing user ${f}`),
+    typeof user?.emailVerified !== 'boolean' && 'emailVerified is not yes or no',
+    (!user?.profile || typeof user.profile !== 'object' || Array.isArray(user.profile)) && 'profile is not an object',
   ].filter(Boolean);
   if (problems.length > 0) console.warn(`[sign-in] session check: ${problems.join(', ')}`);
 }
@@ -78,9 +87,18 @@ async function identify(): Promise<Outcome> {
     token,
     scope,
     async (appId, credential) => {
-      const result = await client.users.getSession(appId, credential);
-      explainRejection(result, scope, now);
-      return result;
+      let answer: VerifySessionResult;
+      try {
+        answer = await client.users.getSession(appId, credential);
+      } catch (err) {
+        console.warn(`[sign-in] session lookup failed: ${err instanceof PiezasError ? err.code : 'unknown error'}`);
+        throw err;
+      }
+      // Piezas can send an empty value here when there's no new token; that means "none".
+      const { refreshedToken, ...result } = answer;
+      const cleaned: VerifySessionResult = refreshedToken ? { ...result, refreshedToken } : result;
+      explainRejection(cleaned, scope, now);
+      return cleaned;
     },
     now,
     LOOKUP_TIMEOUT_MS,
