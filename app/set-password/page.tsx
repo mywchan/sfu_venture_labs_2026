@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AuthError } from '@/components/AuthNotice';
 
 type From = { invite?: string; token?: string };
 
@@ -27,24 +28,28 @@ export default function SetPassword() {
   const title = creating ? 'Create your password' : 'Reset your password';
 
   return (
-    <main className="narrow">
-      <div style={{ textAlign: 'center', margin: '24px 0 20px' }}>
-        <h1>Kestrel Kids Portal</h1>
+    <main className="narrow auth-page">
+      <div className="auth-brand">
+        <h1>Kestrel Kids</h1>
+        <p className="subtitle">Snow school portal</p>
       </div>
-      <section className="card" data-testid="set-password">
+      <section data-testid="set-password">
         {from === null ? (
           <p className="muted">Loading…</p>
         ) : done ? (
           <div data-testid="set-password-done">
             <h2>{creating ? 'Your password is created' : 'Your password is reset'}</h2>
-            <p>You can sign in now. We’ll email you a 6-digit code each time.</p>
-            <Link className="btn primary" href="/">Go to sign in</Link>
+            <div className="auth-notice ok" role="status">
+              <span className="chip fill ok">Done</span>
+              <span>You can sign in now. We’ll email you a 6-digit code each time.</span>
+            </div>
+            <Link className="btn primary wide" href="/">Go to sign in</Link>
           </div>
         ) : !hasLink ? (
           <div data-testid="set-password-no-link">
-            <h2>This link isn’t complete</h2>
-            <p>Open the link from your email again, or ask for a new one on the sign-in page.</p>
-            <Link className="btn" href="/">Go to sign in</Link>
+            <h2>{title}</h2>
+            <AuthError testId="set-password-link-error">This link isn’t complete. Open the link from your email again, or ask for a new one on the sign-in page.</AuthError>
+            <Link className="text-link" href="/">Go to sign in</Link>
           </div>
         ) : (
           <form
@@ -75,17 +80,17 @@ export default function SetPassword() {
             }}
           >
             <h2 data-testid="set-password-title">{title}</h2>
+            {error && <AuthError testId="set-password-error">{error}</AuthError>}
             <div className="field">
-              <label htmlFor="new-password">New password</label>
+              <label htmlFor="new-password">{creating ? 'Choose a password' : 'New password'}</label>
               <input id="new-password" type="password" autoComplete="new-password" required minLength={12} autoFocus value={password} onChange={(e) => setPassword(e.target.value)} data-testid="new-password" />
-              <p className="small muted">At least 12 characters.</p>
+              <p className="small muted" style={{ margin: '4px 0 0' }}>At least 12 characters.</p>
             </div>
             <div className="field">
-              <label htmlFor="new-password-again">Type it again</label>
+              <label htmlFor="new-password-again">{creating ? 'Confirm password' : 'Confirm new password'}</label>
               <input id="new-password-again" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} data-testid="new-password-again" />
             </div>
-            {error && <p className="field-error" role="alert" data-testid="set-password-error">{error}</p>}
-            <button className="primary big" type="submit" disabled={saving} data-testid="set-password-save">{saving ? 'Saving…' : title}</button>
+            <button className="primary wide" type="submit" disabled={saving} data-testid="set-password-save">{saving ? 'Saving…' : creating ? 'Continue' : 'Save password'}</button>
           </form>
         )}
       </section>

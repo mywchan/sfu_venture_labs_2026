@@ -53,53 +53,52 @@ function MyGroup() {
   return (
     <>
       <h1 data-testid="group-title">{group.name} · Level {group.level}</h1>
-      <p className="muted">{kids.length} children today. Tap an alert for details.</p>
+      <p className="small" style={{ fontWeight: 600 }}>{kids.length} children today. Tap an alert for details.</p>
       <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} error={error} />
+
       <div data-testid="group-list">
         {kids.map((c) => {
           const alerts = data.medical.filter((m) => m.childId === c.id);
           const att = todaysAttendance(data, c.id);
           const search = openSearchFor(data, c.id);
+          // The status sits on the card's left strip, as in the wireframes.
+          const [statusClass, statusLabel] = search ? ['danger', 'Missing'] : att?.pickupAt ? ['gone', 'Gone home'] : att?.checkInAt ? ['ok', 'Here'] : ['waiting', 'Not checked in'];
           return (
-            <div className="kid-row" key={c.id} data-testid={`group-child-${c.id}`}>
-              <div className="row between">
+            <div className={`kid-row strip-card ${statusClass}`} key={c.id} data-testid={`group-child-${c.id}`}>
+              <div className="strip">{statusLabel}</div>
+              <div className="strip-body">
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
                 <div>
                   <div className="name">{fullName(c)}</div>
-                  <div className="small muted">
-                    Age {ageOn(c.birthDate, TODAY)} · Bib {c.bib}
-                    {att?.checkInAt ? ` · ${att.jacket} jacket, ${att.pants} pants, ${att.helmet} helmet` : ''}
-                  </div>
+                  <div className="small">Age {ageOn(c.birthDate, TODAY)} · Bib {c.bib}</div>
+                  {att?.checkInAt && <div className="small" style={{ fontWeight: 700 }}>{att.jacket} jacket, {att.pants} pants, {att.helmet} helmet</div>}
                 </div>
-                {search ? (
-                  <span className="chip danger">Missing · {data.acks.some((a) => a.emergencyId === search.id) ? 'patrol acknowledged' : 'awaiting patrol acknowledgement'}</span>
-                ) : att?.pickupAt ? (
-                  <span className="chip">Gone home</span>
-                ) : att?.checkInAt ? (
-                  <span className="chip ok">Here</span>
-                ) : (
-                  <span className="chip warn">Not checked in</span>
+                {search && (
+                  <span className="chip fill danger">Missing · {data.acks.some((a) => a.emergencyId === search.id) ? 'patrol acknowledged' : 'awaiting patrol acknowledgement'}</span>
                 )}
               </div>
               {alerts.map((a) => (
-                <button key={a.id} type="button" className={`alert-line ${a.severity}`} onClick={() => setDetail({ child: c, alert: a })} data-testid={`alert-${c.id}`}>
-                  ⚠ {a.shortAlert}
+                <button key={a.id} type="button" className={`alert-block ${a.severity}`} onClick={() => setDetail({ child: c, alert: a })} data-testid={`alert-${c.id}`}>
+                  <span className="details-pill" aria-hidden="true">Details</span>
+                  <span>⚠ {a.shortAlert}</span>
                 </button>
               ))}
               {att?.clothingFixedAt && (
                 <div className="small muted" data-testid={`clothing-fixed-${c.id}`}>Clothing corrected at {timeLabel(att.clothingFixedAt)} by {userName(data, att.clothingFixedBy ?? null)}</div>
               )}
               {att?.checkInAt && !att.pickupAt && (
-                <div className="row">
-                  <button type="button" className="ghost small" onClick={() => setFixing(c)} data-testid={`fix-clothing-${c.id}`}>
+                <div className="row" style={{ gap: 'var(--space-sm)' }}>
+                  <button type="button" className="small" onClick={() => setFixing(c)} data-testid={`fix-clothing-${c.id}`}>
                     Fix clothing
                   </button>
                   {!search && (
-                    <button type="button" className="ghost small" style={{ color: 'var(--danger)' }} onClick={() => setMissing(c)} data-testid={`report-missing-${c.id}`}>
+                    <button type="button" className="danger small" onClick={() => setMissing(c)} data-testid={`report-missing-${c.id}`}>
                       Report missing
                     </button>
                   )}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
@@ -148,7 +147,7 @@ function FixClothing({ child, onClose }: { child: Child; onClose: () => void }) 
         <ColourPicker id="fix-helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="fix-helmet" />
         {error && <div className="banner danger" data-testid="fix-clothing-error">{error}</div>}
         <button className="big primary" type="submit" disabled={!complete || saving} data-testid="fix-clothing-save">{saving ? 'Saving…' : 'Save'}</button>
-        <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
+        <button type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
       </form>
     </div>
   );
@@ -167,12 +166,18 @@ function MedicalDetail({ child, alert, onClose }: { child: Child; alert: Medical
   return (
     <div className="overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()} data-testid="medical-detail">
-        <h2>{fullName(child)}</h2>
-        <div className={`alert-line ${alert.severity}`}>{alert.shortAlert}</div>
-        <p style={{ marginTop: 12 }}>{alert.details || 'No further details.'}</p>
-        <p><strong>Medication:</strong> {alert.medicationLocation}</p>
-        <p className="small muted">This view was recorded. Medical details are only for keeping {child.firstName} safe today.</p>
-        <button className="big primary" type="button" onClick={onClose}>Close</button>
+        <h2 style={{ marginBottom: 2 }}>Medical details</h2>
+        <p className="subtitle">{fullName(child)} · Bib {child.bib}</p>
+        <div className={`card strip-card ${alert.severity}`} style={{ marginBottom: 'var(--space-md)' }}>
+          <div className="strip">{alert.severity === 'high' ? 'Life-threatening' : alert.severity === 'medium' ? 'Needs attention' : 'Good to know'}</div>
+          <div className="strip-body">
+            <div style={{ fontWeight: 700 }}>{alert.shortAlert}</div>
+            <p className="small" style={{ margin: '6px 0' }}>Details: {alert.details || 'No further details.'}</p>
+            <p className="small" style={{ margin: 0 }}><strong>Medication:</strong> {alert.medicationLocation}</p>
+          </div>
+        </div>
+        <p className="card small" style={{ padding: '10px var(--space-md)', marginBottom: 'var(--space-md)' }}>This view was recorded. Medical details are only for keeping {child.firstName} safe today.</p>
+        <button className="big white" type="button" onClick={onClose}>Close</button>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
+import { AuthError } from '@/components/AuthNotice';
 import { ROLE_HOME } from '@/components/Shell';
 import { useStore } from '@/lib/store';
 
@@ -48,13 +49,13 @@ export default function SignIn() {
   };
 
   return (
-    <main className="narrow">
-      <div style={{ textAlign: 'center', margin: '24px 0 20px' }}>
-        <h1>Kestrel Kids Portal</h1>
-        <p className="muted">The right information about each child, for the right people, at the right time.</p>
+    <main className="narrow auth-page">
+      <div className="auth-brand">
+        <h1>Kestrel Kids</h1>
+        <p className="subtitle">Snow school portal</p>
       </div>
 
-      <section className="card" data-testid="sign-in-form">
+      <section data-testid="sign-in-form">
         {step === 'password' && (
           <form
             onSubmit={submit(async () => {
@@ -68,6 +69,7 @@ export default function SignIn() {
             })}
           >
             <h2>Sign in</h2>
+            {error && <AuthError testId="sign-in-error">{error}</AuthError>}
             <div className="field">
               <label htmlFor="email">Email</label>
               <input id="email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="sign-in-email" />
@@ -76,9 +78,8 @@ export default function SignIn() {
               <label htmlFor="password">Password</label>
               <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} data-testid="sign-in-password" />
             </div>
-            {error && <p className="field-error" role="alert" data-testid="sign-in-error">{error}</p>}
-            <button className="primary big" type="submit" disabled={working} data-testid="sign-in-submit">{working ? 'Checking…' : 'Continue'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => { setError(null); setStep('forgot'); }} data-testid="forgot-password">Forgot your password?</button>
+            <button className="primary wide" type="submit" disabled={working} data-testid="sign-in-submit">{working ? 'Checking…' : 'Continue'}</button>
+            <button type="button" className="text-link" onClick={() => { setError(null); setStep('forgot'); }} data-testid="forgot-password">Forgot your password?</button>
             <p className="small muted" style={{ marginTop: 12 }}>
               New here? Use the link in your email to create your password first.
             </p>
@@ -98,15 +99,15 @@ export default function SignIn() {
               if (!user) startOver(problem);
             })}
           >
-            <h2>Check your email</h2>
-            <p>We sent a 6-digit code to <strong>{email}</strong>.</p>
+            <h2>Enter your code</h2>
+            <p className="small">We emailed a 6-digit code to {email}.</p>
             <div className="field">
               <label htmlFor="code">Code</label>
-              <input id="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={code} onChange={(e) => setCode(e.target.value)} data-testid="sign-in-code" />
+              <input id="code" className="code-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="······" data-testid="sign-in-code" />
             </div>
-            {error && <p className="field-error" role="alert" data-testid="sign-in-error">{error}</p>}
-            <button className="primary big" type="submit" disabled={working} data-testid="sign-in-code-submit">{working ? 'Signing in…' : 'Sign in'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => startOver()}>Back</button>
+            {error && <AuthError testId="sign-in-error">{error}</AuthError>}
+            <button className="primary wide" type="submit" disabled={working} data-testid="sign-in-code-submit">{working ? 'Signing in…' : 'Continue'}</button>
+            <button type="button" className="text-link" onClick={() => startOver()}>Back</button>
           </form>
         )}
 
@@ -117,21 +118,25 @@ export default function SignIn() {
               setStep('forgot-sent');
             })}
           >
-            <h2>Reset your password</h2>
+            <h2>Forgot password</h2>
+            <p className="small">Enter your email and we’ll send a reset link.</p>
             <div className="field">
               <label htmlFor="forgot-email">Email</label>
               <input id="forgot-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="forgot-email" />
             </div>
-            <button className="primary big" type="submit" disabled={working} data-testid="forgot-submit">{working ? 'Sending…' : 'Email me a link'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => startOver()}>Back</button>
+            <button className="primary wide" type="submit" disabled={working} data-testid="forgot-submit">{working ? 'Sending…' : 'Send reset link'}</button>
+            <button type="button" className="text-link" onClick={() => startOver()}>Back to sign in</button>
           </form>
         )}
 
         {step === 'forgot-sent' && (
           <div data-testid="forgot-sent">
-            <h2>Check your email</h2>
-            <p>If that address has an account, a link to set a new password is on its way.</p>
-            <button type="button" className="primary big" onClick={() => startOver()}>Back to sign in</button>
+            <h2>Forgot password</h2>
+            <div className="auth-notice ok" role="status">
+              <span className="chip fill ok">Sent</span>
+              <span>If that address has an account, a link to set a new password is on its way.</span>
+            </div>
+            <button type="button" className="text-link" onClick={() => startOver()}>Back to sign in</button>
           </div>
         )}
       </section>
