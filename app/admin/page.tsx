@@ -24,7 +24,6 @@ function Admin() {
     ['missing', 'Missing information'],
     ['groups', 'Groups'],
     ['children', 'Children'],
-    ['accounts', 'Accounts'],
     ['access', 'Access record'],
     ['upload', 'Store spreadsheet'],
   ];

@@ -9,6 +9,7 @@ import { seedData, type ParentAccount, type Role, type User } from '@/lib/seed/d
 import { APP_ROLES, type RoleAssignment } from './auth/authorization';
 import type { VerifiedIdentity } from './auth/session';
 import { allowPasswordLinks, makeInvite, readInvite, siteAddress } from './password-links';
+import { demoMode, recordsClient } from './demo-store';
 import { piezasServer } from './piezas/settings';
 import { Refused } from './refused';
 
@@ -27,7 +28,7 @@ const NOT_YET = 'pending';
 
 async function setUp() {
   const required = { type: 'text', required: true } as const;
-  const { kk_account: account } = await piezasServer().client.defineEntities({
+  const { kk_account: account } = await recordsClient().defineEntities({
     kk_account: {
       fields: { authUserId: required, appUserId: required, name: required, email: required, role: required, childIds: { type: 'text' } },
     },
@@ -85,8 +86,7 @@ export async function roleAssignments(identity: VerifiedIdentity): Promise<RoleA
 let cachedDirectory: { until: number; value: Promise<Directory> } | null = null;
 export type Directory = { accounts: Account[]; users: User[]; parentAccounts: ParentAccount[] };
 
-/** Presentation accounts only work when the app runs on this computer with `npm run dev`. */
-export const demoMode = () => process.env.NODE_ENV !== 'production';
+export { demoMode };
 
 async function loadDirectory(): Promise<Directory> {
   const accounts = await listAll(await records());

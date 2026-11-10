@@ -1,6 +1,7 @@
 import { PiezasError } from '@piezas/sdk';
 import { cookies } from 'next/headers';
 import { CODE_STEP_COOKIE, fromThisSite, notFromThisSite, saveSession } from '@/lib/server/auth/current-user';
+import { demoMode } from '@/lib/server/demo-store';
 import { piezasServer } from '@/lib/server/piezas/settings';
 
 export const runtime = 'nodejs';
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** Step two: check the emailed code and finish signing in. */
 export async function POST(request: Request) {
+  if (demoMode()) return Response.json({ error: 'Not available in the presentation version.' }, { status: 404 });
   if (!fromThisSite(request)) return notFromThisSite();
   let body: { code?: unknown };
   try {

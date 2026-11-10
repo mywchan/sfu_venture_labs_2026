@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <div className="preview-banner" data-testid="preview-banner">
-          Preview with made-up children. Adults on file, check-ins, pickups and missing reports are saved. Other changes reset when you reload the page.
+          Presentation version with made-up children. Changes last until the app restarts and never reach the live site.
         </div>
         <StoreProvider>{children}</StoreProvider>
         <ReportProblem />

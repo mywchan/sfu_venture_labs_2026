@@ -2,7 +2,7 @@
 // person on any device. Server only. Piezas's own notification service sends
 // emails and texts; this is the app's inbox, kept as Piezas records.
 
-import { Piezas } from '@piezas/sdk';
+import { recordsClient } from './demo-store';
 import type { AppNotification, User } from '@/lib/seed/data';
 
 export type NewNotification = {
@@ -18,7 +18,7 @@ export type NewNotification = {
 const required = { type: 'text', required: true } as const;
 
 async function setUp() {
-  const piezas = new Piezas({ apiKey: process.env.PIEZAS_API_KEY! });
+  const piezas = recordsClient();
   const { kk_notification: notification } = await piezas.defineEntities({
     kk_notification: {
       fields: {

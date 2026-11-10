@@ -2,7 +2,7 @@
 // in Piezas. Server only: this file uses PIEZAS_API_KEY, so it must never be
 // imported by a browser component.
 
-import { Piezas } from '@piezas/sdk';
+import { recordsClient } from './demo-store';
 import { phoneProblem, formatPhone } from '@/lib/access';
 
 // The same shape the screens use. `linkId` and `personId` are Piezas record ids
@@ -28,7 +28,7 @@ const PAGE_SIZE = 100;
 const PIEZAS_RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function setUp() {
-  const piezas = new Piezas({ apiKey: process.env.PIEZAS_API_KEY! });
+  const piezas = recordsClient();
   // Safe to repeat: existing record types are reused. "kk_" keeps these apart
   // from anything else stored in the same Piezas account.
   const { kk_person: person, kk_child_person: childPerson } = await piezas.defineEntities({

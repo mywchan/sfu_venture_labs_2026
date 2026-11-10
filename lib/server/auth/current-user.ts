@@ -71,6 +71,7 @@ async function identify(): Promise<Outcome> {
   if (demoMode()) {
     const demoUser = seedData.users.find((u) => u.id === jar.get(DEMO_COOKIE)?.value);
     if (demoUser) return { kind: 'ok', user: demoUser };
+    return { kind: 'none' }; // the presentation version never asks Piezas who is signed in
   }
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return { kind: 'none' };

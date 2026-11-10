@@ -1,5 +1,6 @@
 import { createAccount, directory, removeAccount, resendWelcome } from '@/lib/server/accounts';
 import { requireUser } from '@/lib/server/auth/current-user';
+import { demoMode } from '@/lib/server/demo-store';
 import { Refused } from '@/lib/server/refused';
 
 export const runtime = 'nodejs';
@@ -19,6 +20,7 @@ const forScreen = async () => ({
 
 /** Administrator only: everyone with an account. */
 export async function GET(request: Request) {
+  if (demoMode()) return Response.json({ error: 'Not available in the presentation version.' }, { status: 404 });
   const auth = await requireUser(request);
   if ('response' in auth) return auth.response;
   if (auth.user.role !== 'admin') return notAllowed();
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
 
 /** Administrator only: create or remove an account, or email a set-password link again. */
 export async function POST(request: Request) {
+  if (demoMode()) return Response.json({ error: 'Not available in the presentation version.' }, { status: 404 });
   const auth = await requireUser(request);
   if ('response' in auth) return auth.response;
   if (auth.user.role !== 'admin') return notAllowed();

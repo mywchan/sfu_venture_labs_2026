@@ -1,7 +1,7 @@
 // Who is in which group today, saved in Piezas. Server only. The made-up groups
 // in lib/seed stay as the starting point; saved groups and placements win.
 
-import { Piezas } from '@piezas/sdk';
+import { recordsClient } from './demo-store';
 import { groupForInstructor, groupOfChild, fullName, parentOwnsChild } from '@/lib/access';
 import { currentLessonDayId, seedData, TODAY_LESSON_DAY, type Data, type Group, type GroupMember, type User } from '@/lib/seed/data';
 import { hasUnread, notify, quietly } from './notifications';
@@ -12,7 +12,7 @@ const MAX_GROUP = 6;
 const NOT_PLACED = 'none';
 
 async function setUp() {
-  const piezas = new Piezas({ apiKey: process.env.PIEZAS_API_KEY! });
+  const piezas = recordsClient();
   const { kk_group: group, kk_group_placement: placement } = await piezas.defineEntities({
     kk_group: {
       fields: {

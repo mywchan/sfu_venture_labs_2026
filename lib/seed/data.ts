@@ -2,6 +2,8 @@
 // invented (example.test addresses never receive mail). Nothing here is stored
 // in Piezas yet: the preview reads this module directly.
 
+import { addSeasonData } from './season';
+
 export type Role = 'parent' | 'instructor' | 'desk' | 'patrol' | 'admin';
 
 export type User = { id: string; name: string; email: string; role: Role };
@@ -417,7 +419,7 @@ const demoParentLinks: ParentAccount[] = childPersons
   .filter((cp) => !parentPersons[cp.personId])
   .map((cp) => ({ userId: demoParentId(cp.personId), childId: cp.childId }));
 
-export const seedData: Data = {
+export const seedData: Data = addSeasonData({
   users: [...users, ...demoParents],
   children,
   persons,
@@ -433,4 +435,4 @@ export const seedData: Data = {
   emergencies: [],
   acks: [],
   accessRecords: [],
-};
+}, TODAY, TODAY_LESSON_DAY);

@@ -1,6 +1,7 @@
 import { PiezasError } from '@piezas/sdk';
 import { claimInvite } from '@/lib/server/accounts';
 import { fromThisSite, notFromThisSite } from '@/lib/server/auth/current-user';
+import { demoMode } from '@/lib/server/demo-store';
 import { piezasServer } from '@/lib/server/piezas/settings';
 import { Refused } from '@/lib/server/refused';
 
@@ -12,6 +13,7 @@ const EXPIRED = 'This link has expired or has already been used. Go to the sign-
 
 /** Finishes a first-time "create password" link or a "forgot password" link. */
 export async function POST(request: Request) {
+  if (demoMode()) return Response.json({ error: 'Not available in the presentation version.' }, { status: 404 });
   if (!fromThisSite(request)) return notFromThisSite();
   let body: { invite?: unknown; token?: unknown; password?: unknown };
   try {

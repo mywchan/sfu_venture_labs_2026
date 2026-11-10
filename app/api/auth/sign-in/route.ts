@@ -1,6 +1,7 @@
 import { PiezasError } from '@piezas/sdk';
 import { cookies } from 'next/headers';
 import { CODE_STEP_COOKIE, cookieOptions, fromThisSite, notFromThisSite } from '@/lib/server/auth/current-user';
+import { demoMode } from '@/lib/server/demo-store';
 import { piezasServer } from '@/lib/server/piezas/settings';
 
 export const runtime = 'nodejs';
@@ -12,6 +13,7 @@ const WRONG = 'That email and password don’t match an account.';
 
 /** Step one: check the password. Piezas then emails the 6-digit code. */
 export async function POST(request: Request) {
+  if (demoMode()) return Response.json({ error: 'Not available in the presentation version.' }, { status: 404 });
   if (!fromThisSite(request)) return notFromThisSite();
   let body: { email?: unknown; password?: unknown };
   try {

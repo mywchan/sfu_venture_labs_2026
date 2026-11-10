@@ -6,7 +6,7 @@
 // made-up list in lib/seed. A saved record always wins over the made-up one, and
 // the made-up list is never copied into Piezas.
 
-import { Piezas } from '@piezas/sdk';
+import { recordsClient } from './demo-store';
 import { groupForInstructor, parentOwnsChild } from '@/lib/access';
 import {
   currentLessonDayId,
@@ -42,7 +42,7 @@ const OUTCOMES = ['Found safe', 'Found, needed first aid', 'Handed over to polic
 const HOUR_MINUTE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 async function setUp() {
-  const piezas = new Piezas({ apiKey: process.env.PIEZAS_API_KEY! });
+  const piezas = recordsClient();
   // Safe to repeat: existing record types are reused.
   const { kk_attendance: attendance, kk_pickup_refusal: refusal, kk_emergency: emergency, kk_patrol_ack: ack } = await piezas.defineEntities({
     kk_attendance: {

@@ -1,53 +1,48 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { ROLE_HOME, ROLE_LABEL } from '@/components/Shell';
-import type { Role, User } from '@/lib/seed/data';
-import { fullName } from '@/lib/access';
 import { useStore } from '@/lib/store';
+import type { Role } from '@/lib/seed/data';
 
-type Step = 'password' | 'code' | 'forgot' | 'forgot-sent';
-
-async function post(url: string, body: unknown) {
-  try {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = (await res.json().catch(() => ({}))) as { error?: string; restart?: boolean };
-    return { ok: res.ok, ...data };
-  } catch {
-    return { ok: false, error: 'Couldn’t reach Peak Pals. Check your connection and try again.', restart: false };
-  }
-}
+// Presentation version (dev branch): the first prototype's sign-in, with a few
+// accounts per role for quick switching. No real password or emailed code.
+const PREVIEW_CODE = '123456';
 
 export default function SignIn() {
-  const { me, refreshSession } = useStore();
+  const { data, me, refreshSession } = useStore();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [step, setStep] = useState<Step>('password');
+  const [step, setStep] = useState<'password' | 'code'>('password');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
 
   useEffect(() => {
     if (me) router.replace(ROLE_HOME[me.role]);
   }, [me, router]);
 
-  const startOver = (nextError: string | null = null) => {
-    setStep('password');
-    setPassword('');
-    setCode('');
-    setError(nextError);
+  const user = data.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+
+  const go = async (id: string) => {
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/demo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: id }) });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? 'That account couldn’t be opened.');
+        return;
+      }
+      const { user: signedIn, problem } = await refreshSession();
+      if (!signedIn) setError(problem);
+    } catch {
+      setError('That account couldn’t be opened. Please try again.');
+    }
   };
 
-  const submit = (work: () => Promise<void>) => async (e: FormEvent) => {
-    e.preventDefault();
-    if (working) return;
-    setWorking(true);
-    setError(null);
-    await work();
-    setWorking(false);
-  };
+  const roles: Role[] = ['parent', 'instructor', 'desk', 'patrol', 'admin'];
+  const quickAccounts = data.users.filter((u) => demoHint[u.id] !== undefined);
 
   return (
     <main className="narrow">
@@ -57,154 +52,93 @@ export default function SignIn() {
       </div>
 
       <section className="card" data-testid="sign-in-form">
-        {step === 'password' && (
+        {step === 'password' ? (
           <form
-            onSubmit={submit(async () => {
-              const result = await post('/api/auth/sign-in', { email, password });
-              if (!result.ok) {
-                setError(result.error ?? 'That didn’t work. Please try again.');
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!user || !password) {
+                setError('That email and password don’t match an account.');
                 return;
               }
-              setPassword('');
+              setError(null);
               setStep('code');
-            })}
+            }}
           >
             <h2>Sign in</h2>
             <div className="field">
               <label htmlFor="email">Email</label>
-              <input id="email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="sign-in-email" />
+              <input id="email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="sign-in-email" />
             </div>
             <div className="field">
               <label htmlFor="password">Password</label>
-              <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} data-testid="sign-in-password" />
+              <input id="password" type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="sign-in-password" />
             </div>
-            {error && <p className="field-error" role="alert" data-testid="sign-in-error">{error}</p>}
-            <button className="primary big" type="submit" disabled={working} data-testid="sign-in-submit">{working ? 'Checking…' : 'Continue'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => { setError(null); setStep('forgot'); }} data-testid="forgot-password">Forgot your password?</button>
+            {error && <p className="field-error">{error}</p>}
+            <button className="primary big" type="submit" data-testid="sign-in-submit">Continue</button>
             <p className="small muted" style={{ marginTop: 12 }}>
-              New here? Use the link in your email to create your password first.
+              New parents get a welcome email after registering in the store, with a link to set their password.
             </p>
           </form>
-        )}
-
-        {step === 'code' && (
+        ) : (
           <form
-            onSubmit={submit(async () => {
-              const result = await post('/api/auth/code', { code });
-              if (!result.ok) {
-                if (result.restart) startOver(result.error ?? null);
-                else setError(result.error ?? 'That didn’t work. Please try again.');
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (code.trim() !== PREVIEW_CODE) {
+                setError('That code isn’t right. Check the latest email from Kestrel Kids.');
                 return;
               }
-              const { user, problem } = await refreshSession();
-              if (!user) startOver(problem);
-            })}
+              void go(user!.id);
+            }}
           >
             <h2>Check your email</h2>
-            <p>We sent a 6-digit code to <strong>{email}</strong>.</p>
+            <p>We sent a 6-digit code to <strong>{user?.email}</strong>.</p>
             <div className="field">
               <label htmlFor="code">Code</label>
-              <input id="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={code} onChange={(e) => setCode(e.target.value)} data-testid="sign-in-code" />
+              <input id="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} data-testid="sign-in-code" />
             </div>
-            {error && <p className="field-error" role="alert" data-testid="sign-in-error">{error}</p>}
-            <button className="primary big" type="submit" disabled={working} data-testid="sign-in-code-submit">{working ? 'Signing in…' : 'Sign in'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => startOver()}>Back</button>
+            {error && <p className="field-error">{error}</p>}
+            <button className="primary big" type="submit" data-testid="sign-in-code-submit">Sign in</button>
+            <p className="small muted" style={{ marginTop: 12 }}>Preview: no email is sent. The code is {PREVIEW_CODE}.</p>
+            <button type="button" className="ghost" onClick={() => { setStep('password'); setCode(''); setError(null); }}>Back</button>
           </form>
-        )}
-
-        {step === 'forgot' && (
-          <form
-            onSubmit={submit(async () => {
-              await post('/api/auth/forgot', { email });
-              setStep('forgot-sent');
-            })}
-          >
-            <h2>Reset your password</h2>
-            <div className="field">
-              <label htmlFor="forgot-email">Email</label>
-              <input id="forgot-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="forgot-email" />
-            </div>
-            <button className="primary big" type="submit" disabled={working} data-testid="forgot-submit">{working ? 'Sending…' : 'Email me a link'}</button>
-            <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => startOver()}>Back</button>
-          </form>
-        )}
-
-        {step === 'forgot-sent' && (
-          <div data-testid="forgot-sent">
-            <h2>Check your email</h2>
-            <p>If that address has an account, a link to set a new password is on its way.</p>
-            <button type="button" className="primary big" onClick={() => startOver()}>Back to sign in</button>
-          </div>
         )}
       </section>
 
-      {process.env.NODE_ENV !== 'production' && <PresentationAccounts />}
+      <section className="card demo-accounts" data-testid="demo-accounts">
+        <h2>Try the preview as…</h2>
+        <p className="small muted">Skip sign-in and jump straight into any role.</p>
+        {step === 'password' && error && quickAccounts.length > 0 && !email && <p className="field-error">{error}</p>}
+        {roles.map((role) => (
+          <div key={role} style={{ marginBottom: 12 }}>
+            <h3 className="small muted" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ROLE_LABEL[role]}</h3>
+            <div className="stack">
+              {quickAccounts
+                .filter((u) => u.role === role)
+                .map((u) => (
+                  <button key={u.id} type="button" onClick={() => void go(u.id)} data-testid={`demo-${u.id}`}>
+                    <span>{u.name}</span>
+                    <span className="small muted">{demoHint[u.id]}</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        ))}
+      </section>
     </main>
   );
 }
 
-const ROLES: Role[] = ['parent', 'instructor', 'desk', 'patrol', 'admin'];
-
-/** One tap into any account, with no password or code. Only exists under `npm run dev`. */
-function PresentationAccounts() {
-  const { data, refreshSession } = useStore();
-  const [role, setRole] = useState<Role>('parent');
-  const [search, setSearch] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const term = search.trim().toLowerCase();
-  const shown = data.users.filter((u) => (term ? u.name.toLowerCase().includes(term) : u.role === role));
-
-  const hint = (u: User) => {
-    if (u.role === 'parent') {
-      const kids = data.parentAccounts.filter((p) => p.userId === u.id).map((p) => data.children.find((c) => c.id === p.childId)).filter(Boolean);
-      return kids.map((c) => fullName(c!)).join(', ');
-    }
-    if (u.role === 'instructor') return data.groups.find((g) => g.instructorId === u.id)?.name ?? 'No group yet';
-    return ROLE_LABEL[u.role];
-  };
-
-  const go = async (u: User) => {
-    setBusy(u.id);
-    setError(null);
-    const result = await post('/api/auth/demo', { userId: u.id });
-    if (result.ok) {
-      const { user, problem } = await refreshSession();
-      if (user) return;
-      setError(problem);
-    } else {
-      setError(result.error ?? 'That account couldn’t be opened.');
-    }
-    setBusy(null);
-  };
-
-  return (
-    <section className="card demo-accounts" data-testid="demo-accounts">
-      <h2>Presentation accounts</h2>
-      <p className="small muted">{data.users.length} made-up accounts. One tap, no password or code. Only available on this computer.</p>
-      <div className="field">
-        <label htmlFor="demo-search">Find a person</label>
-        <input id="demo-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type a name" data-testid="demo-search" />
-      </div>
-      {!term && (
-        <div className="tabs" role="tablist">
-          {ROLES.map((r) => (
-            <button key={r} type="button" role="tab" aria-selected={role === r} onClick={() => setRole(r)} data-testid={`demo-tab-${r}`}>
-              {ROLE_LABEL[r]} ({data.users.filter((u) => u.role === r).length})
-            </button>
-          ))}
-        </div>
-      )}
-      {error && <p className="field-error" role="alert" data-testid="demo-error">{error}</p>}
-      <div className="stack">
-        {shown.map((u) => (
-          <button key={u.id} type="button" disabled={busy !== null} onClick={() => void go(u)} data-testid={`demo-${u.id}`}>
-            <span>{u.name}</span>
-            <span className="small muted">{busy === u.id ? 'Opening…' : hint(u)}</span>
-          </button>
-        ))}
-        {shown.length === 0 && <p className="muted small">No one matches “{search}”.</p>}
-      </div>
-    </section>
-  );
-}
+const demoHint: Record<string, string> = {
+  'u-melissa': "Owen's mother",
+  'u-jun': "Lily's mother",
+  'u-claire': "Ava's mother",
+  'u-fatima': "Zoe's mother · form not signed",
+  'u-sam': 'Group A · level 3',
+  'u-priya': 'Group B · level 1',
+  'u-jordan': 'Group C · level 5',
+  'u-alex': 'No group yet',
+  'u-mei': 'Check-in and pickup',
+  'u-rob': 'Patrol director',
+  'u-kai': 'Patroller',
+  'u-hana': 'Snow school director',
+};
