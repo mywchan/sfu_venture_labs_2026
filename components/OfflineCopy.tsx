@@ -11,7 +11,7 @@
 // plus an offline-capable page so the screen opens with no connection at all.
 
 import { useCallback, useEffect, useState } from 'react';
-import { ageOn, fullName, groupForInstructor, todaysAttendance } from '@/lib/access';
+import { ageOn, DAY_END_HOUR, DAY_END_LABEL, fullName, groupForInstructor, todaysAttendance } from '@/lib/access';
 import { TODAY, TODAY_LESSON_DAY, type Child, type Group, type Severity, type User } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
 
@@ -32,8 +32,8 @@ export type OfflineSnapshot = {
   }[];
 };
 
-// Presentation version: 6 p.m. so the demo can run in the late afternoon.
-const EXPIRES = `${TODAY}T18:00:00`;
+// End of the ski day: 4 p.m. live, 6 p.m. in the presentation version (see lib/access.ts).
+const EXPIRES = `${TODAY}T${DAY_END_HOUR}:00:00`;
 const keyFor = (userId: string) => `kk-offline-${userId}`;
 
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -139,7 +139,7 @@ export function useOfflineCopy(me: User) {
       }),
     };
     if (!validSnapshot(snap, me, group, kids, now)) {
-      setError('A valid copy cannot be saved now. Check your group and the preview clock; copies expire at 6 p.m.');
+      setError(`A valid copy cannot be saved now. Check your group and the preview clock; copies expire at ${DAY_END_LABEL}.`);
       return;
     }
     try {
@@ -204,7 +204,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView, error, canSave
           <button type="button" className="primary big" disabled={!canSave} onClick={onSave} data-testid="offline-save">Save for offline</button>
         </>
       )}
-      <p className={copy ? 'small' : 'small muted'} style={{ marginTop: 12, marginBottom: 0 }}>Expires at 6 p.m. on the preview clock. Expiry is checked and deletion attempted while this screen is open. Closing the app does not erase the copy. Delete it before sharing this device.</p>
+      <p className={copy ? 'small' : 'small muted'} style={{ marginTop: 12, marginBottom: 0 }}>Expires at {DAY_END_LABEL} on the preview clock. Expiry is checked and deletion attempted while this screen is open. Closing the app does not erase the copy. Delete it before sharing this device.</p>
     </section>
   );
 }

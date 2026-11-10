@@ -126,11 +126,15 @@ export function lastSeenTimeChoices(current: Date) {
 }
 
 /**
- * Police must be called 60 minutes after last seen, or at the day's cutoff, whichever comes first.
- * Presentation version: the cutoff is 6 p.m. (not 4 p.m.) so the demo can run in the late afternoon.
+ * The end of the ski day: 4 p.m. on the live site. The presentation version
+ * (run with `npm run dev`) uses 6 p.m. so the demo can run in the late afternoon.
  */
+export const DAY_END_HOUR = process.env.NODE_ENV === 'production' ? 16 : 18;
+export const DAY_END_LABEL = DAY_END_HOUR === 16 ? '4 p.m.' : '6 p.m.';
+
+/** Police must be called 60 minutes after last seen, or at the end of the day, whichever comes first. */
 export function policeDeadline(lastSeenAt: string) {
   const seen = new Date(lastSeenAt).getTime();
-  const cutoff = new Date(lastSeenAt.slice(0, 10) + 'T18:00:00').getTime();
+  const cutoff = new Date(`${lastSeenAt.slice(0, 10)}T${DAY_END_HOUR}:00:00`).getTime();
   return new Date(Math.min(seen + 60 * 60_000, cutoff));
 }

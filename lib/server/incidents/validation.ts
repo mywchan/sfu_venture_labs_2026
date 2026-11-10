@@ -33,14 +33,15 @@ function wallTime(ms: number): number {
     Number(parts.hour), Number(parts.minute), Number(parts.second));
 }
 
-// Presentation version: the day's cutoff is 6 p.m. (not 4 p.m.) so the demo can run late.
-const CUTOFF_HOUR = 18;
+// The end of the ski day: 4 p.m. on the live site, 6 p.m. in the presentation
+// version (`npm run dev`) so the demo can run late. Matches lib/access.ts.
+const CUTOFF_HOUR = process.env.NODE_ENV === 'production' ? 16 : 18;
 
 function dayCutoff(seen: number): number {
   const date = new Date(wallTime(seen));
   const target = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), CUTOFF_HOUR);
   // Resolve the offset at the deadline, not at last seen: a clock change can
-  // occur between them. 18:00 is outside Vancouver's repeated/skipped hours.
+  // occur between them. 16:00 and 18:00 are outside Vancouver's repeated/skipped hours.
   let candidate = target;
   for (let i = 0; i < 4; i++) {
     const delta = target - wallTime(candidate);
