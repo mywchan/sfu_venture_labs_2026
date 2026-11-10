@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { StoreProvider } from '@/lib/store';
 import './globals.css';
+import { ReportProblem } from './report-problem';
 
 export const metadata: Metadata = {
   title: 'Kestrel Kids Portal',
@@ -15,9 +16,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <div className="preview-banner" data-testid="preview-banner">
-          Preview with made-up children. Changes reset when you reload the page.
+          Preview with made-up children. Adults on file, check-ins, pickups and missing reports are saved. Other changes reset when you reload the page.
         </div>
         <StoreProvider>{children}</StoreProvider>
+        <ReportProblem />
       </body>
     </html>
   );

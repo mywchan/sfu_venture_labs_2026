@@ -77,7 +77,7 @@ The portal gives each person one screen with exactly what their job needs, at th
 - Emergency: child, reported by, last seen place, last seen time, jacket colour, pants colour, helmet colour, status (open or closed), shared with police at, police notice mailed (yes or no), closed at, outcome
 - Patrol_Acknowledgement: emergency, patroller, acknowledged at
 - Access_Record: who, role, what was viewed, child, time
-- Staff and parent sign-ins and roles are kept by Piezas sign-in, never as records here.
+- Staff and parent passwords and sign-in codes are kept by Piezas sign-in, never as records here. Account: a person's sign-in, name, role and, for a parent, their children; only the server can write it.
 
 ## Acceptance Scenarios
 

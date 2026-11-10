@@ -63,6 +63,7 @@ export type Attendance = {
   clothingFixedAt?: string | null;
   pickupAt: string | null;
   pickedUpBy: string | null; // person id
+  pickedUpName?: string | null; // their name at the time, kept even if they're later removed
   releasedBy: string | null; // user id
 };
 
@@ -95,6 +96,17 @@ export type PatrolAck = { emergencyId: string; patrollerId: string; at: string }
 
 export type AccessRecord = { id: string; userId: string; role: Role; what: string; childId: string; at: string };
 
+export type AppNotification = {
+  id: string;
+  kind: string;
+  message: string;
+  href: string;
+  actionLabel: string;
+  urgent: boolean;
+  createdAt: string;
+  readAt: string | null;
+};
+
 export type Data = {
   users: User[];
   children: Child[];
@@ -113,9 +125,15 @@ export type Data = {
   accessRecords: AccessRecord[];
 };
 
-// The preview pretends today is the first Saturday of lessons.
-export const TODAY = '2026-12-12';
-export const TODAY_LESSON_DAY = 'day-2026-12-12';
+/** A date as YYYY-MM-DD in this computer's own time zone. */
+export function localDate(d = new Date()) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// Today comes from the system clock. Each new day starts with a clean slate.
+export const TODAY = localDate();
+export const TODAY_LESSON_DAY = `day-${TODAY}`;
 
 const at = (hhmm: string) => `${TODAY}T${hhmm}:00`;
 
@@ -127,6 +145,7 @@ export const users: User[] = [
   { id: 'u-sam', name: 'Sam Lee', email: 'sam.lee@example.test', role: 'instructor' },
   { id: 'u-priya', name: 'Priya Natt', email: 'priya.natt@example.test', role: 'instructor' },
   { id: 'u-jordan', name: 'Jordan Blake', email: 'jordan.blake@example.test', role: 'instructor' },
+  { id: 'u-alex', name: 'Alex Rivera', email: 'alex.rivera@example.test', role: 'instructor' },
   { id: 'u-mei', name: 'Mei Tanaka', email: 'mei.tanaka@example.test', role: 'desk' },
   { id: 'u-rob', name: 'Rob Fournier', email: 'rob.fournier@example.test', role: 'patrol' },
   { id: 'u-kai', name: 'Kai Andersen', email: 'kai.andersen@example.test', role: 'patrol' },
@@ -285,9 +304,14 @@ export const consents: ConsentForm[] = children
   .map((c) => ({ childId: c.id, signedBy: 'Parent', signedDate: '2026-11-20', photoConsent: c.id !== 'c-lily' }));
 
 export const lessonDays: LessonDay[] = [
-  { id: 'day-2026-12-12', date: '2026-12-12', programDay: 'Saturday' },
-  { id: 'day-2026-12-19', date: '2026-12-19', programDay: 'Saturday' },
-  { id: 'day-2027-01-09', date: '2027-01-09', programDay: 'Saturday' },
+  { id: TODAY_LESSON_DAY, date: TODAY, programDay: new Date().getDay() === 0 ? 'Sunday' : 'Saturday' },
+  ...(
+    [
+      { id: 'day-2026-12-12', date: '2026-12-12', programDay: 'Saturday' },
+      { id: 'day-2026-12-19', date: '2026-12-19', programDay: 'Saturday' },
+      { id: 'day-2027-01-09', date: '2027-01-09', programDay: 'Saturday' },
+    ] as LessonDay[]
+  ).filter((d) => d.date !== TODAY),
 ];
 
 export const groups: Group[] = [

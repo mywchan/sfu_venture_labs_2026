@@ -101,7 +101,7 @@ function Desk() {
 }
 
 function ChildPanel({ child }: { child: Child }) {
-  const { data, checkIn, release, refusePickup } = useStore();
+  const { data, checkIn, release, refusePickup, guardianLink } = useStore();
   const a = todaysAttendance(data, child.id);
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
@@ -112,11 +112,27 @@ function ChildPanel({ child }: { child: Child }) {
   const [otherName, setOtherName] = useState('');
   const [askOther, setAskOther] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const [onList, setOnList] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const search = openSearchFor(data, child.id);
   const [pickupPersonId, setPickupPersonId] = useState<string | null>(null);
   const pickupTrigger = useRef<HTMLButtonElement | null>(null);
   const pickupAdult = adults.find(({ person, link }) => person.id === pickupPersonId && link.canPickUp);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Runs a save; the panel stays put and shows the reason if it fails. */
+  const save = async (work: () => Promise<void>, ifFailed = '') => {
+    setSaving(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(`${ifFailed}${err instanceof Error ? err.message : 'That didn’t save.'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="card" data-testid="desk-child-panel">
@@ -126,13 +142,14 @@ function ChildPanel({ child }: { child: Child }) {
       {search && <div className="banner danger" data-testid="desk-incident-status">
         {child.firstName} is reported missing. {data.acks.some((ack) => ack.emergencyId === search.id) ? 'Patrol has acknowledged the report.' : 'Awaiting patrol acknowledgement.'} Pickup is blocked until the incident is closed.
       </div>}
+      {error && <div className="banner danger" data-testid="desk-save-error">{error}</div>}
 
       {!a?.checkInAt && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!clothingDone) return;
-            checkIn(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
+            if (!clothingDone || saving) return;
+            void save(() => checkIn(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() }));
           }}
           data-testid="checkin-form"
         >
@@ -141,7 +158,7 @@ function ChildPanel({ child }: { child: Child }) {
           <ColourPicker id="jacket" label="Jacket colour" value={jacket} onChange={setJacket} testId="checkin-jacket" />
           <ColourPicker id="pants" label="Pants colour" value={pants} onChange={setPants} testId="checkin-pants" />
           <ColourPicker id="helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="checkin-helmet" />
-          <button className="primary big" type="submit" disabled={!clothingDone} data-testid="checkin-submit">Check in {child.firstName}</button>
+          <button className="primary big" type="submit" disabled={!clothingDone || saving} data-testid="checkin-submit">{saving ? 'Saving…' : `Check in ${child.firstName}`}</button>
         </form>
       )}
 
@@ -154,22 +171,32 @@ function ChildPanel({ child }: { child: Child }) {
 
       {a?.pickupAt && (
         <div className="banner ok" data-testid="pickup-status">
-          Went home at {timeLabel(a.pickupAt)} with {data.persons.find((p) => p.id === a.pickedUpBy)?.name}, released by {userName(data, a.releasedBy)}
+          Went home at {timeLabel(a.pickupAt)} with {a.pickedUpName ?? data.persons.find((p) => p.id === a.pickedUpBy)?.name}, released by {userName(data, a.releasedBy)}
         </div>
       )}
 
       {a?.checkInAt && !a.pickupAt && !search && (
         <div data-testid="pickup-panel">
+          {guardianLink === 'offline' && (
+            <div className="banner danger" data-testid="guardians-stale">
+              Can’t reach Peak Pals, so this list may be out of date. Call a parent to confirm before releasing {child.firstName}.
+            </div>
+          )}
           <h3>Pickup: approved adults</h3>
           <p className="small muted">Ask for photo ID if you don’t recognize the adult.</p>
           {refused && (
             <div className="banner danger" data-testid="pickup-refused">
-              {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. The attempt has been recorded. Call a parent below.
+              {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. Call a parent below.
+            </div>
+          )}
+          {onList && (
+            <div className="banner ok" data-testid="pickup-on-list">
+              {onList} is on {child.firstName}’s pickup list. Check their photo ID, then use their Release button.
             </div>
           )}
           <div className="stack">
             {adults.filter((x) => x.link.canPickUp).map(({ person, link }) => (
-              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} onClick={(event) => { pickupTrigger.current = event.currentTarget; setPickupPersonId(person.id); }} data-testid={`release-to-${person.name}`}>
+              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={(event) => { pickupTrigger.current = event.currentTarget; setPickupPersonId(person.id); }} data-testid={`release-to-${person.name}`}>
                 <span>Release to <strong>{person.name}</strong> <span className="muted small">({link.relationship})</span></span>
                 <span className="small muted">{person.phone}</span>
               </button>
@@ -182,10 +209,11 @@ function ChildPanel({ child }: { child: Child }) {
               adultName={pickupAdult.person.name}
               onCancel={() => { setPickupPersonId(null); pickupTrigger.current?.focus(); }}
               onConfirm={() => {
-                // Recheck the current preview permissions and attendance at confirmation.
+                // Recheck permissions and attendance at confirmation. The server checks again when saving.
                 if (!a?.checkInAt || a.pickupAt || search || !adults.some(({ person, link }) => person.id === pickupAdult.person.id && link.canPickUp)) return;
-                release(child.id, pickupAdult.person.id);
+                const adultId = pickupAdult.person.id;
                 setPickupPersonId(null);
+                void save(() => release(child.id, adultId));
               }}
             />
           )}
@@ -197,8 +225,19 @@ function ChildPanel({ child }: { child: Child }) {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!otherName.trim()) return;
-                refusePickup(child.id, otherName.trim());
-                setRefused(otherName.trim());
+                // Only a name that isn't on the approved list counts as a refusal.
+                const tidy = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+                const approved = adults.find((x) => x.link.canPickUp && tidy(x.person.name) === tidy(otherName));
+                if (approved) {
+                  setOnList(approved.person.name);
+                  setRefused(null);
+                } else {
+                  // The warning shows straight away; only the record of it waits for the save.
+                  const nameGiven = otherName.trim();
+                  void save(() => refusePickup(child.id, nameGiven), 'The warning stands, but this attempt wasn’t recorded. ');
+                  setRefused(otherName.trim());
+                  setOnList(null);
+                }
                 setOtherName('');
                 setAskOther(false);
               }}
@@ -220,7 +259,7 @@ function ChildPanel({ child }: { child: Child }) {
         ))}
       </ul>
       {!adults.some((x) => x.link.contactOrder) && <p className="small muted">No emergency contacts recorded. Contact the snow school office.</p>}
-      {missing && <ReportMissing child={child} onClose={() => setMissing(false)} />}
+      {missing && <ReportMissing child={child} onClose={() => setMissing(false)} limitToSystemTime />}
     </div>
   );
 }

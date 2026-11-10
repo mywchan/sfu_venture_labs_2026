@@ -105,7 +105,7 @@ function MyGroup() {
         })}
       </div>
       {detail && <MedicalDetail child={detail.child} alert={detail.alert} onClose={() => setDetail(null)} />}
-      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} />}
+      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} limitToSystemTime />}
       {fixing && <FixClothing child={fixing} onClose={() => setFixing(null)} />}
     </>
   );
@@ -118,17 +118,26 @@ function FixClothing({ child, onClose }: { child: Child; onClose: () => void }) 
   const [pants, setPants] = useState(att?.pants ?? '');
   const [helmet, setHelmet] = useState(att?.helmet ?? '');
   const complete = Boolean(jacket.trim() && pants.trim() && helmet.trim());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="fix-title" onClick={onClose}>
       <form
         className="sheet"
         onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!complete) return;
-          fixClothing(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
-          onClose();
+          if (!complete || saving) return;
+          setSaving(true);
+          setError(null);
+          try {
+            await fixClothing(child.id, { jacket: jacket.trim(), pants: pants.trim(), helmet: helmet.trim() });
+            onClose();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'That didn’t save.');
+            setSaving(false);
+          }
         }}
         data-testid="fix-clothing-sheet"
       >
@@ -137,7 +146,8 @@ function FixClothing({ child, onClose }: { child: Child; onClose: () => void }) 
         <ColourPicker id="fix-jacket" label="Jacket colour" value={jacket} onChange={setJacket} testId="fix-jacket" />
         <ColourPicker id="fix-pants" label="Pants colour" value={pants} onChange={setPants} testId="fix-pants" />
         <ColourPicker id="fix-helmet" label="Helmet colour" value={helmet} onChange={setHelmet} testId="fix-helmet" />
-        <button className="big primary" type="submit" disabled={!complete} data-testid="fix-clothing-save">Save</button>
+        {error && <div className="banner danger" data-testid="fix-clothing-error">{error}</div>}
+        <button className="big primary" type="submit" disabled={!complete || saving} data-testid="fix-clothing-save">{saving ? 'Saving…' : 'Save'}</button>
         <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
       </form>
     </div>

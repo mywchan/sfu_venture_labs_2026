@@ -14,6 +14,7 @@ import {
   parentOwnsChild,
   phoneProblem,
   timeLabel,
+  todayLabel,
   todaysAttendance,
   userName,
 } from '@/lib/access';
@@ -79,14 +80,14 @@ function LessonsTab({ childId }: { childId: string }) {
   const pickedUpBy = data.persons.find((p) => p.id === att?.pickedUpBy);
   return (
     <div className="card" data-testid="lessons-tab">
-      <h2>Today · Saturday, December 12</h2>
+      <h2>Today · {todayLabel()}</h2>
       <dl className="kv">
         <dt>Group</dt>
         <dd data-testid="lesson-group">{group ? `${group.name} · level ${group.level} · ${userName(data, group.instructorId)}` : 'Not placed yet'}</dd>
         <dt>Checked in</dt>
         <dd data-testid="lesson-checkin">{att?.checkInAt ? timeLabel(att.checkInAt) : 'Not yet'}</dd>
         <dt>Picked up</dt>
-        <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
+        <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${att.pickedUpName ?? pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
       </dl>
       <h3 style={{ marginTop: 16 }}>Lesson days</h3>
       <ul className="small">
@@ -99,12 +100,33 @@ function LessonsTab({ childId }: { childId: string }) {
 }
 
 function AdultsTab({ childId }: { childId: string }) {
-  const { data, removeLink } = useStore();
+  const { data, removeLink, guardianLink } = useStore();
   const [editing, setEditing] = useState<{ link?: ChildPerson; person?: Person } | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const adults = adultsFor(data, childId);
+
+  const remove = async (linkId: string) => {
+    setRemoving(linkId);
+    setRemoveError(null);
+    try {
+      await removeLink(linkId);
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+    } finally {
+      setRemoving(null);
+    }
+  };
+
   return (
     <div className="stack" data-testid="adults-tab">
       <p className="muted small">Add anyone who may be called in an emergency or may pick your child up. Different last names are fine.</p>
+      <div data-testid="guardian-link">
+        {guardianLink === 'connected' && <span className="chip ok">Connected to Peak Pals</span>}
+        {guardianLink === 'checking' && <span className="chip">Connecting…</span>}
+        {guardianLink === 'offline' && <span className="chip warn">Not connected: changes can’t be saved right now</span>}
+      </div>
+      {removeError && <div className="banner danger" data-testid="remove-error">{removeError}</div>}
       {adults.map(({ link, person }) => (
         <div className="card" key={link.id} data-testid={`adult-${person.name}`}>
           <div className="row between">
@@ -119,7 +141,7 @@ function AdultsTab({ childId }: { childId: string }) {
           </div>
           <div className="row" style={{ marginTop: 10 }}>
             <button type="button" onClick={() => setEditing({ link, person })}>Edit</button>
-            <button type="button" className="ghost" onClick={() => removeLink(link.id)}>Remove</button>
+            <button type="button" className="ghost" disabled={removing === link.id} onClick={() => remove(link.id)}>{removing === link.id ? 'Removing…' : 'Remove'}</button>
           </div>
         </div>
       ))}
@@ -146,13 +168,16 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
   const [order, setOrder] = useState<string>(initial.link?.contactOrder ? String(initial.link.contactOrder) : '');
   const [canPickUp, setCanPickUp] = useState(initial.link?.canPickUp ?? true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   return (
     <form
       className="card"
       data-testid="adult-form"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (saving) return;
         const errs: Record<string, string> = {};
         if (!name.trim()) errs.name = 'Enter a name.';
         if (!relationship.trim()) errs.relationship = 'Say how they are related, for example Grandmother.';
@@ -160,13 +185,20 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
         if (p) errs.phone = p;
         setErrors(errs);
         if (Object.keys(errs).length) return;
-        savePerson(
-          childId,
-          { id: initial.person?.id ?? `p-new-${++personN}`, name: name.trim(), phone: formatPhone(phone), email: email.trim() },
-          { relationship: relationship.trim(), contactOrder: order ? Number(order) : null, canPickUp },
-          initial.link?.id,
-        );
-        onDone();
+        setSaving(true);
+        setSaveError(null);
+        try {
+          await savePerson(
+            childId,
+            { id: initial.person?.id ?? `p-new-${++personN}`, name: name.trim(), phone: formatPhone(phone), email: email.trim() },
+            { relationship: relationship.trim(), contactOrder: order ? Number(order) : null, canPickUp },
+            initial.link?.id,
+          );
+          onDone();
+        } catch (err) {
+          setSaveError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+          setSaving(false);
+        }
       }}
     >
       <h2>{initial.person ? 'Edit adult' : 'Add an adult'}</h2>
@@ -206,8 +238,9 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
           </label>
         </div>
       </div>
+      {saveError && <div className="banner danger" data-testid="adult-save-error">{saveError}</div>}
       <div className="row">
-        <button className="primary" type="submit" data-testid="adult-save">Save</button>
+        <button className="primary" type="submit" disabled={saving} data-testid="adult-save">{saving ? 'Saving…' : 'Save'}</button>
         <button type="button" className="ghost" onClick={onDone}>Cancel</button>
       </div>
     </form>
@@ -340,7 +373,7 @@ function ConsentTab({ childId }: { childId: string }) {
           setError('Tick the box and type your full name to sign.');
           return;
         }
-        signConsent({ childId, signedBy: signature.trim(), signedDate: '2026-12-12', photoConsent: photo });
+        signConsent({ childId, signedBy: signature.trim(), signedDate: TODAY, photoConsent: photo });
       }}
     >
       <h2>Consent form</h2>
