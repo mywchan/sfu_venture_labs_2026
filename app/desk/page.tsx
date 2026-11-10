@@ -238,7 +238,7 @@ function ChildPanel({ child }: { child: Child }) {
           <button type="button" className="ghost" style={{ color: 'var(--danger)' }} onClick={() => setMissing(true)} data-testid="desk-report-missing">Report missing</button>
         </div>
       )}
-      {missing && <ReportMissing child={child} onClose={() => setMissing(false)} />}
+      {missing && <ReportMissing child={child} onClose={() => setMissing(false)} limitToSystemTime />}
     </div>
   );
 }
