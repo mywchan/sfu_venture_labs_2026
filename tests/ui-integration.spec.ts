@@ -85,7 +85,7 @@ for (const corruption of ['bad JSON', 'invalid shape', 'expired', 'future saved 
       const cached = JSON.parse(localStorage.getItem(key)!);
       if (mode === 'bad JSON') { localStorage.setItem(key, '{broken'); return; }
       if (mode === 'invalid shape') { localStorage.setItem(key, JSON.stringify({ kids: 'not an array' })); return; }
-      if (mode === 'expired') cached.expiresAt = cached.expiresAt.replace('16:00:00', '12:00:00');
+      if (mode === 'expired') cached.expiresAt = cached.expiresAt.replace('18:00:00', '12:00:00');
       if (mode === 'future saved time') cached.savedAt = cached.savedAt.replace(/T.*/, 'T23:59:00');
       if (mode === 'wrong instructor') cached.instructorId = 'u-priya';
       if (mode === 'wrong group') cached.groupId = 'g-b';
@@ -112,7 +112,7 @@ test('a saved snapshot expires on the existing preview clock while the screen is
   await expect(page.getByTestId('offline-view')).toBeVisible();
   await context.setOffline(true);
   await expect(page.getByTestId('offline-copy')).toBeVisible();
-  await page.clock.fastForward(3 * 60 * 60 * 1000);
+  await page.clock.fastForward(12 * 60 * 60 * 1000); // well past the 6 p.m. expiry
   await expect(page.getByTestId('offline-unavailable')).toBeVisible();
   await expect(page.getByTestId('offline-copy')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('kk-offline-u-sam'))).toBeNull();
