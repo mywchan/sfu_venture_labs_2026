@@ -62,7 +62,7 @@ function MyGroup() {
                   </div>
                 </div>
                 {search ? (
-                  <span className="chip danger">Missing · patrol searching</span>
+                  <span className="chip danger">Missing · {data.acks.some((a) => a.emergencyId === search.id) ? 'patrol acknowledged' : 'awaiting patrol acknowledgement'}</span>
                 ) : att?.pickupAt ? (
                   <span className="chip">Gone home</span>
                 ) : att?.checkInAt ? (

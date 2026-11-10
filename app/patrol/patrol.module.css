@@ -72,10 +72,26 @@
 .selectPrompt { margin: 0; }
 .closedSearches { overflow-x: auto; }
 
+.snapshot { border-top: 3px solid var(--brand); }
+.snapshotHeading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.snapshotName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.2rem; font-weight: 700; margin: 0; }
+.lastKnown { background: var(--surface-2); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.lastKnown p { margin-bottom: 4px; }
+.snapshotDeadline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.snapshot .identification { margin-bottom: 12px; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; border-left: 2px solid var(--line); padding: 0 0 16px 12px; }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline p { margin: 4px 0 0; }
+.eventTime { color: var(--ink-2); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.closedSearches summary { cursor: pointer; min-height: 44px; padding: 8px 0; }
+.closedSearches .timeline { min-width: 200px; }
+
 @media (min-width: 800px) {
   .dashboard { grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.8fr); }
   .responseControls { grid-template-columns: minmax(0, 1fr) auto; }
   .responseControls button { width: auto; }
   .closureForm { grid-template-columns: minmax(0, 1fr) auto; }
   .closureForm label, .closureForm select { grid-column: 1 / -1; }
+  .detail .timeline li { grid-template-columns: 100px minmax(0, 1fr); }
 }

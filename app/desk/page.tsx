@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ColourPicker } from '@/components/ColourPicker';
 import { ReportMissing } from '@/components/ReportMissing';
 import { Shell } from '@/components/Shell';
@@ -114,13 +114,18 @@ function ChildPanel({ child }: { child: Child }) {
   const [refused, setRefused] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const search = openSearchFor(data, child.id);
+  const [pickupPersonId, setPickupPersonId] = useState<string | null>(null);
+  const pickupTrigger = useRef<HTMLButtonElement | null>(null);
+  const pickupAdult = adults.find(({ person, link }) => person.id === pickupPersonId && link.canPickUp);
 
   return (
     <div className="card" data-testid="desk-child-panel">
       <h2>{fullName(child)}</h2>
       <p className="muted small">Bib {child.bib} · Level {child.level} · {group ? `${group.name}, ${userName(data, group.instructorId)}` : 'No group yet'}</p>
 
-      {search && <div className="banner danger">Ski patrol is searching for {child.firstName}.</div>}
+      {search && <div className="banner danger" data-testid="desk-incident-status">
+        {child.firstName} is reported missing. {data.acks.some((ack) => ack.emergencyId === search.id) ? 'Patrol has acknowledged the report.' : 'Awaiting patrol acknowledgement.'} Pickup is blocked until the incident is closed.
+      </div>}
 
       {!a?.checkInAt && (
         <form
@@ -164,12 +169,26 @@ function ChildPanel({ child }: { child: Child }) {
           )}
           <div className="stack">
             {adults.filter((x) => x.link.canPickUp).map(({ person, link }) => (
-              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} onClick={() => release(child.id, person.id)} data-testid={`release-to-${person.name}`}>
+              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} onClick={(event) => { pickupTrigger.current = event.currentTarget; setPickupPersonId(person.id); }} data-testid={`release-to-${person.name}`}>
                 <span>Release to <strong>{person.name}</strong> <span className="muted small">({link.relationship})</span></span>
                 <span className="small muted">{person.phone}</span>
               </button>
             ))}
           </div>
+          {pickupAdult && (
+            <PickupConfirmation
+              key={pickupAdult.person.id}
+              childName={fullName(child)}
+              adultName={pickupAdult.person.name}
+              onCancel={() => { setPickupPersonId(null); pickupTrigger.current?.focus(); }}
+              onConfirm={() => {
+                // Recheck the current preview permissions and attendance at confirmation.
+                if (!a?.checkInAt || a.pickupAt || search || !adults.some(({ person, link }) => person.id === pickupAdult.person.id && link.canPickUp)) return;
+                release(child.id, pickupAdult.person.id);
+                setPickupPersonId(null);
+              }}
+            />
+          )}
           {!askOther ? (
             <button type="button" className="ghost" style={{ marginTop: 10 }} onClick={() => setAskOther(true)} data-testid="someone-else">Someone else is here</button>
           ) : (
@@ -191,16 +210,41 @@ function ChildPanel({ child }: { child: Child }) {
               </div>
             </form>
           )}
-          <h3 style={{ marginTop: 16 }}>Parents to call</h3>
-          <ul className="small" data-testid="desk-contacts">
-            {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
-              <li key={link.id}>{person.name} ({link.relationship}): {person.phone}</li>
-            ))}
-          </ul>
           <button type="button" className="ghost" style={{ color: 'var(--danger)' }} onClick={() => setMissing(true)} data-testid="desk-report-missing">Report missing</button>
         </div>
       )}
+      <h3 style={{ marginTop: 16 }}>Emergency contacts</h3>
+      <ul className="small" data-testid="desk-contacts">
+        {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
+          <li key={link.id}>{link.contactOrder}. {person.name} ({link.relationship}): <a href={`tel:${person.phone}`}>{person.phone}</a></li>
+        ))}
+      </ul>
+      {!adults.some((x) => x.link.contactOrder) && <p className="small muted">No emergency contacts recorded. Contact the snow school office.</p>}
       {missing && <ReportMissing child={child} onClose={() => setMissing(false)} />}
     </div>
+  );
+}
+
+function PickupConfirmation({ childName, adultName, onCancel, onConfirm }: {
+  childName: string; adultName: string; onCancel: () => void; onConfirm: () => void;
+}) {
+  const [identityChecked, setIdentityChecked] = useState(false);
+  return (
+    <form className="card" style={{ marginTop: 12 }} aria-labelledby="pickup-confirm-title" aria-describedby="pickup-confirm-note"
+      data-testid="pickup-confirmation" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onCancel(); } }}
+      onSubmit={(event) => { event.preventDefault(); if (identityChecked) onConfirm(); }}>
+      <h3 id="pickup-confirm-title">Confirm pickup</h3>
+      <p>Child: <strong>{childName}</strong></p>
+      <p>Authorized adult: <strong>{adultName}</strong></p>
+      <p className="small muted" id="pickup-confirm-note">Staff must check identity before recording pickup. The app does not independently verify identity.</p>
+      <label className="checkbox field">
+        <input type="checkbox" autoFocus checked={identityChecked} onChange={(event) => setIdentityChecked(event.target.checked)} data-testid="pickup-identity-checked" />
+        I checked this adult’s identity against the approved pickup information.
+      </label>
+      <div className="row">
+        <button type="submit" className="primary" disabled={!identityChecked} data-testid="pickup-confirm-release">Confirm release</button>
+        <button type="button" className="ghost" onClick={onCancel} data-testid="pickup-cancel">Cancel</button>
+      </div>
+    </form>
   );
 }
