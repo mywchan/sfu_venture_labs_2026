@@ -59,7 +59,7 @@ export function AccountsTab() {
         onSubmit={async (e) => {
           e.preventDefault();
           if (saving) return;
-          const created = await send({ name, email, role, childIds: role === 'parent' ? childIds : [] }, `Welcome email sent to ${email.trim()}.`);
+          const created = await send({ name, email, role, childIds: role === 'parent' ? childIds : [] }, `Create-password email sent to ${email.trim()}.`);
           if (created) {
             setName('');
             setEmail('');
@@ -69,7 +69,7 @@ export function AccountsTab() {
         data-testid="new-account-form"
       >
         <h2>Create an account</h2>
-        <p className="small muted">The person gets an email with a link to set their password.</p>
+        <p className="small muted">The person gets an email with a link to create their password.</p>
         <div className="grid2">
           <div className="field"><label htmlFor="acct-name">Name</label><input id="acct-name" required value={name} onChange={(e) => setName(e.target.value)} data-testid="account-name" /></div>
           <div className="field"><label htmlFor="acct-email">Email</label><input id="acct-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="account-email" /></div>
@@ -115,7 +115,7 @@ export function AccountsTab() {
                     <td className="small">{a.email}</td>
                     <td>{ROLE_LABEL[a.role]}</td>
                     <td className="row" style={{ gap: 6 }}>
-                      <button type="button" className="ghost small" disabled={saving} onClick={() => void send({ action: 'resend', accountId: a.id }, `Set-password email sent to ${a.email}.`)}>Resend email</button>
+                      <button type="button" className="ghost small" disabled={saving} onClick={() => void send({ action: 'resend', accountId: a.id }, `Password email sent to ${a.email}.`)}>Resend email</button>
                       <button
                         type="button"
                         className="ghost small"

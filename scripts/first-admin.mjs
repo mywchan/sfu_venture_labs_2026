@@ -1,7 +1,7 @@
 // Creates the very first administrator, who can then create everyone else in the
 // app. Refuses to run once an administrator exists.
 //   npm run accounts:first-admin -- "Your Name" you@example.com
-import { randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Piezas } from '@piezas/sdk';
 
 const [name, rawEmail] = process.argv.slice(2);
@@ -30,17 +30,15 @@ if (admins.data.length > 0) {
   process.exit(1);
 }
 
-const [row] = (await piezas.users.importUsers(appId, [{ email, emailVerified: true, password: randomBytes(32).toString('base64url'), profile: { name } }])).results;
-if (!row || row.status === 'error') {
-  console.error('\nPiezas could not create that account.\n');
-  process.exit(1);
-}
-const person = (await piezas.users.listUsers(appId, { email, limit: 20 })).users.find((u) => u.email.toLowerCase() === email);
-if (!person) {
-  console.error('\nThe new account was not found. Please try again.\n');
-  process.exit(1);
-}
-
-await account.create({ title: name, data: { authUserId: person.id, appUserId: `acct-${person.id}`, name: name.trim(), email, role: 'admin' } });
-await piezas.users.forgotPassword(appId, email);
-console.log(`\nDone. Check ${email} for an email with a link to set your password.\n`);
+// The same signed link the app makes (see lib/server/password-links.ts).
+const created = await account.create({ title: name, data: { authUserId: 'pending', appUserId: `acct-${randomUUID()}`, name: name.trim(), email, role: 'admin' } });
+const key = createHash('sha256').update(`kk-invite|${process.env.PIEZAS_API_KEY}`).digest();
+const payload = Buffer.from(JSON.stringify({ a: created.id, e: Date.now() + 7 * 86_400_000 })).toString('base64url');
+const invite = `${payload}.${createHmac('sha256', key).update(payload).digest('base64url')}`;
+const site = process.env.PIEZAS_APP_URL ?? 'http://localhost:3000';
+await piezas.sendEmail({
+  to: email,
+  subject: 'Create your Kestrel Kids password',
+  body: `Hello ${name.trim()},\n\nYou're the first administrator of the Kestrel Kids portal. Create your password here:\n\n${new URL(site).origin}/set-password?invite=${invite}\n\nThis link works for 7 days.\n\nKestrel Kids`,
+});
+console.log(`\nDone. Check ${email} for an email with a link to create your password.\n`);

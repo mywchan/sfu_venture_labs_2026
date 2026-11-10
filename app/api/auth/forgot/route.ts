@@ -1,5 +1,5 @@
 import { fromThisSite, notFromThisSite } from '@/lib/server/auth/current-user';
-import { piezasServer } from '@/lib/server/piezas/settings';
+import { sendPasswordHelp } from '@/lib/server/accounts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,11 +11,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { email?: unknown };
     const email = typeof body.email === 'string' ? body.email.trim() : '';
     if (email && email.length <= 254) {
-      const { client, scope } = piezasServer();
-      await client.users.forgotPassword(scope.appId, email);
+      await sendPasswordHelp(email, request);
     }
-  } catch {
-    console.error('[forgot password] request failed');
+  } catch (err) {
+    console.error('[forgot password] request failed', err instanceof Error ? err.message : '');
   }
   return Response.json({ ok: true });
 }

@@ -80,7 +80,7 @@ export default function SignIn() {
             <button className="primary big" type="submit" disabled={working} data-testid="sign-in-submit">{working ? 'Checking…' : 'Continue'}</button>
             <button type="button" className="ghost" style={{ marginTop: 8 }} onClick={() => { setError(null); setStep('forgot'); }} data-testid="forgot-password">Forgot your password?</button>
             <p className="small muted" style={{ marginTop: 12 }}>
-              New here? Use the link in your welcome email to set your password first.
+              New here? Use the link in your email to create your password first.
             </p>
           </form>
         )}

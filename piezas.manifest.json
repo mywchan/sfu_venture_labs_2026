@@ -116,7 +116,7 @@
   "publicRoutes": [],
   "deploy": {
     "requiredEnv": ["PIEZAS_API_URL", "PIEZAS_APP_ID", "PIEZAS_TENANT_ID"],
-    "optionalEnv": ["PIEZAS_USERS_URL"],
+    "optionalEnv": ["PIEZAS_USERS_URL", "PIEZAS_APP_URL"],
     "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc"
   },
   "recipes": [],

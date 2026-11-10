@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof PiezasError) {
       if (err.code === 'invalid_credentials') return Response.json({ error: WRONG }, { status: 401 });
-      if (err.code === 'account_pending') return Response.json({ error: 'Please set your password from your welcome email first.' }, { status: 401 });
+      if (err.code === 'account_pending') return Response.json({ error: 'Please create your password from the link in your email first.' }, { status: 401 });
       if (err.code === 'rate_limited') return Response.json({ error: 'Too many tries. Please wait a few minutes and try again.' }, { status: 429 });
     }
     console.error('[sign-in]', err instanceof PiezasError ? err.code : 'failed');

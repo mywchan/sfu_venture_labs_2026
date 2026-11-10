@@ -41,9 +41,9 @@ export async function POST(request: Request) {
     return Response.json({ error: 'That request could not be read.' }, { status: 400 });
   }
   try {
-    if (body.action === 'resend') await resendWelcome(body.accountId);
+    if (body.action === 'resend') await resendWelcome(body.accountId, request);
     else if (body.action === 'remove') await removeAccount(body.accountId, auth.user);
-    else await createAccount(body);
+    else await createAccount(body, request);
     return Response.json(await forScreen());
   } catch (err) {
     return failed(err);
