@@ -248,13 +248,36 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
 }
 
 function MedicalTab({ childId }: { childId: string }) {
-  const { data, setNoMedical, removeMedical } = useStore();
+  const { data, setNoMedical, removeMedical, medicalLink } = useStore();
   const child = data.children.find((c) => c.id === childId)!;
   const alerts = data.medical.filter((m) => m.childId === childId);
   const [editing, setEditing] = useState<MedicalAlert | 'new' | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (work: () => Promise<void>) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (medicalLink !== 'connected' && data.medical.length === 0) {
+    return (
+      <div className={medicalLink === 'offline' ? 'banner danger' : 'card muted'} data-testid="medical-loading">
+        {medicalLink === 'offline' ? 'Can’t reach Peak Pals, so your child’s medical details can’t be shown right now. Please try again shortly.' : 'Loading medical details…'}
+      </div>
+    );
+  }
 
   return (
     <div className="stack" data-testid="medical-tab">
+      {error && <div className="banner danger" data-testid="medical-error">{error}</div>}
       <p className="muted small">
         Your child’s instructor sees the <strong>short alert</strong> at a glance. The details open only with a tap, and each look is recorded. The desk never sees medical information.
       </p>
@@ -265,13 +288,13 @@ function MedicalTab({ childId }: { childId: string }) {
           <p className="small muted">Medication kept: {m.medicationLocation}</p>
           <div className="row">
             <button type="button" onClick={() => setEditing(m)}>Edit</button>
-            <button type="button" className="ghost" onClick={() => removeMedical(m.id)}>Remove</button>
+            <button type="button" className="ghost" disabled={saving} onClick={() => void save(() => removeMedical(m.id))}>Remove</button>
           </div>
         </div>
       ))}
       {alerts.length === 0 && (
         <label className="checkbox card">
-          <input type="checkbox" checked={child.noMedicalConditions} onChange={(e) => setNoMedical(childId, e.target.checked)} data-testid="no-medical" />
+          <input type="checkbox" checked={child.noMedicalConditions} disabled={saving} onChange={(e) => { const value = e.target.checked; void save(() => setNoMedical(childId, value)); }} data-testid="no-medical" />
           {child.firstName} has no allergies, medical conditions or medications
         </label>
       )}
@@ -291,19 +314,28 @@ function MedicalForm({ childId, initial, onDone }: { childId: string; initial: M
   const [med, setMed] = useState(initial?.medicationLocation ?? '');
   const [severity, setSeverity] = useState<Severity>(initial?.severity ?? 'high');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   return (
     <form
       className="card"
       data-testid="medical-form"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (saving) return;
         if (!shortAlert.trim()) {
           setError('Write the short alert the instructor should see.');
           return;
         }
-        saveMedical({ childId, shortAlert: shortAlert.trim(), details: details.trim(), medicationLocation: med.trim() || 'None', severity }, initial?.id);
-        onDone();
+        setSaving(true);
+        setError(null);
+        try {
+          await saveMedical({ childId, shortAlert: shortAlert.trim(), details: details.trim(), medicationLocation: med.trim() || 'None', severity }, initial?.id);
+          onDone();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+          setSaving(false);
+        }
       }}
     >
       <h2>{initial ? 'Edit' : 'Add an allergy or condition'}</h2>
@@ -332,7 +364,7 @@ function MedicalForm({ childId, initial, onDone }: { childId: string; initial: M
         </div>
       </div>
       <div className="row">
-        <button className="primary" type="submit" data-testid="medical-save">Save</button>
+        <button className="primary" type="submit" disabled={saving} data-testid="medical-save">{saving ? 'Saving…' : 'Save'}</button>
         <button type="button" className="ghost" onClick={onDone}>Cancel</button>
       </div>
     </form>
@@ -340,12 +372,21 @@ function MedicalForm({ childId, initial, onDone }: { childId: string; initial: M
 }
 
 function ConsentTab({ childId }: { childId: string }) {
-  const { data, me, signConsent } = useStore();
+  const { data, me, signConsent, medicalLink } = useStore();
   const existing = data.consents.find((c) => c.childId === childId);
   const [photo, setPhoto] = useState(existing?.photoConsent ?? false);
   const [agree, setAgree] = useState(false);
   const [signature, setSignature] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (medicalLink !== 'connected' && !existing) {
+    return (
+      <div className={medicalLink === 'offline' ? 'banner danger' : 'card muted'} data-testid="consent-loading">
+        {medicalLink === 'offline' ? 'Can’t reach Peak Pals, so the consent form can’t be shown right now. Please try again shortly.' : 'Loading consent form…'}
+      </div>
+    );
+  }
 
   if (existing) {
     return (
@@ -367,13 +408,21 @@ function ConsentTab({ childId }: { childId: string }) {
     <form
       className="card"
       data-testid="consent-form"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (saving) return;
         if (!agree || !signature.trim()) {
           setError('Tick the box and type your full name to sign.');
           return;
         }
-        signConsent({ childId, signedBy: signature.trim(), signedDate: TODAY, photoConsent: photo });
+        setSaving(true);
+        setError(null);
+        try {
+          await signConsent({ childId, signedBy: signature.trim(), photoConsent: photo });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+          setSaving(false);
+        }
       }}
     >
       <h2>Consent form</h2>
@@ -393,7 +442,7 @@ function ConsentTab({ childId }: { childId: string }) {
         <input id="sig" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={me?.name} data-testid="consent-signature" />
       </div>
       {error && <p className="field-error">{error}</p>}
-      <button className="primary" type="submit" data-testid="consent-submit">Sign consent form</button>
+      <button className="primary" type="submit" disabled={saving} data-testid="consent-submit">{saving ? 'Saving…' : 'Sign consent form'}</button>
     </form>
   );
 }

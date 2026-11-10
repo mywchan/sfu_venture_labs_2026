@@ -187,7 +187,7 @@ function Patrol() {
 }
 
 function SearchScreen({ em }: { em: Emergency }) {
-  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess, guardianLink } = useStore();
+  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess, guardianLink, medicalLink } = useStore();
   const child = data.children.find((c) => c.id === em.childId)!;
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
@@ -308,7 +308,7 @@ function SearchScreen({ em }: { em: Emergency }) {
 
         <section className="card" data-testid="search-medical">
           <h2>Medical alerts</h2>
-          {alerts.length === 0 ? <p className="muted">No medical alerts.</p> : alerts.map((a) => (
+          {medicalLink !== 'connected' && alerts.length === 0 ? <p className={medicalLink === 'offline' ? 'field-error' : 'muted'} data-testid="medical-not-loaded">{medicalLink === 'offline' ? 'Can’t load medical alerts. Call the family.' : 'Loading medical alerts…'}</p> : alerts.length === 0 ? <p className="muted">No medical alerts.</p> : alerts.map((a) => (
             <div key={a.id} style={{ marginBottom: 10 }}>
               <div className={`alert-line ${a.severity}`}>{a.shortAlert}</div>
               <p className="small" style={{ margin: '6px 0 0' }}>{a.details} Medication: {a.medicationLocation}.</p>

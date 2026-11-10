@@ -46,8 +46,11 @@ function Admin() {
 }
 
 function MissingTab() {
-  const { data } = useStore();
+  const { data, medicalLink } = useStore();
   const rows = data.children.map((c) => ({ c, missing: missingInfo(data, c.id) })).filter((r) => r.missing.length > 0);
+  if (medicalLink !== 'connected' && data.consents.length === 0) {
+    return <div className={medicalLink === 'offline' ? 'banner danger' : 'card muted'} data-testid="missing-loading">{medicalLink === 'offline' ? 'Can’t reach Peak Pals, so this list can’t be shown right now.' : 'Loading…'}</div>;
+  }
   return (
     <section className="card" data-testid="missing-list">
       <h2>{rows.length === 0 ? 'Every child’s information is complete' : `${rows.length} of ${data.children.length} children are missing information`}</h2>

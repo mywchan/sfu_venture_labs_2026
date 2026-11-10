@@ -42,10 +42,11 @@ type Store = {
   readNotifications: (ids: string[]) => Promise<void>;
   savePerson: (childId: string, person: Person, link: Omit<ChildPerson, 'id' | 'childId' | 'personId'>, linkId?: string) => Promise<void>;
   removeLink: (linkId: string) => Promise<void>;
-  saveMedical: (alert: Omit<MedicalAlert, 'id'>, id?: string) => void;
-  removeMedical: (id: string) => void;
-  setNoMedical: (childId: string, value: boolean) => void;
-  signConsent: (form: ConsentForm) => void;
+  medicalLink: 'checking' | 'connected' | 'offline'; // have medical alerts arrived from Peak Pals?
+  saveMedical: (alert: Omit<MedicalAlert, 'id'>, id?: string) => Promise<void>;
+  removeMedical: (id: string) => Promise<void>;
+  setNoMedical: (childId: string, value: boolean) => Promise<void>;
+  signConsent: (form: Pick<ConsentForm, 'childId' | 'signedBy' | 'photoConsent'>) => Promise<void>;
   // instructor
   logAccess: (what: string, childId: string) => void;
   fixClothing: (childId: string, clothing: { jacket: string; pants: string; helmet: string }) => Promise<void>;
@@ -115,6 +116,18 @@ function applyGuardians(d: Data, rows: GuardianRow[], childIds: Set<string>): Da
 // Today's groups, saved ones included (see lib/server/roster.ts).
 type RosterRows = { groups: Group[]; groupMembers: GroupMember[] };
 
+// What this person may see of medical alerts and consent forms (see lib/server/medical.ts).
+type MedicalRows = { medical: MedicalAlert[]; consents: ConsentForm[]; noMedical: Record<string, boolean> };
+
+function applyMedical(d: Data, m: MedicalRows): Data {
+  return {
+    ...d,
+    medical: m.medical,
+    consents: m.consents,
+    children: d.children.map((c) => (c.id in m.noMedical ? { ...c, noMedicalConditions: m.noMedical[c.id] } : c)),
+  };
+}
+
 // What the server sends back for today (see lib/server/today.ts).
 type TodayRows = { attendance: Attendance[]; refusals: PickupRefusal[]; emergencies: Emergency[]; acks: PatrolAck[] };
 
@@ -153,6 +166,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [liveLink, setLiveLink] = useState<'checking' | 'connected' | 'offline'>('checking');
   // Counts saves, so a background refresh that started before a save can't overwrite it.
   const saves = useRef(0);
+  const [medicalLink, setMedicalLink] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const notificationSaves = useRef(0);
 
@@ -300,6 +314,56 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Medical alerts come only from Peak Pals, cut down to what this role may see.
+  // They re-check when a search opens or closes, as that changes what patrol sees.
+  useEffect(() => {
+    if (!meId) {
+      setMedicalLink('checking');
+      return;
+    }
+    let stopped = false;
+    const load = async () => {
+      const startedAt = saves.current;
+      try {
+        const res = await fetch('/api/medical', { cache: 'no-store' });
+        if (res.status === 401) return endSession();
+        if (!res.ok) throw new Error(String(res.status));
+        const rows = (await res.json()) as MedicalRows;
+        if (stopped || saves.current !== startedAt) return;
+        setData((d) => applyMedical(d, rows));
+        setMedicalLink('connected');
+      } catch {
+        if (!stopped) setMedicalLink('offline');
+      }
+    };
+    void load();
+    const t = setInterval(load, staff ? 5_000 : 30_000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [meId, staff, openSearches, endSession]);
+
+  /** Saves a medical or consent change. The screen only changes once it's saved. */
+  const sendMedical = useCallback(async (action: Record<string, unknown>) => {
+    saves.current += 1;
+    try {
+      let res: Response;
+      try {
+        res = await fetch('/api/medical', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
+      } catch {
+        throw new Error('Couldn’t reach Peak Pals, so that was not saved.');
+      }
+      const body = (await res.json().catch(() => ({}))) as Partial<MedicalRows> & { error?: string };
+      if (!res.ok || !body.medical || !body.consents || !body.noMedical) throw new Error(body.error ?? 'That didn’t save. Please try again.');
+      const rows = { medical: body.medical, consents: body.consents, noMedical: body.noMedical };
+      setData((d) => applyMedical(d, rows));
+      setMedicalLink('connected');
+    } finally {
+      saves.current += 1;
+    }
+  }, []);
+
   // Notifications come from Peak Pals on the same 5-second beat as today's records.
   useEffect(() => {
     setNotifications([]);
@@ -399,6 +463,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       guardianLink,
       sessionChecked,
       liveLink,
+      medicalLink,
       notifications,
       readNotifications,
       savePerson: async (childId, person, link, linkId) => {
@@ -416,16 +481,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const rest = data.childPersons.filter((cp) => cp.id !== linkId);
         await pushGuardians(data, { ...data, childPersons: renumberContacts(rest, childId) }, childId, [linkId]);
       },
-      saveMedical: (alert, id) =>
-        update((d) => ({
-          ...d,
-          children: d.children.map((c) => (c.id === alert.childId ? { ...c, noMedicalConditions: false } : c)),
-          medical: id ? d.medical.map((m) => (m.id === id ? { ...alert, id } : m)) : [...d.medical, { ...alert, id: newId('m') }],
-        })),
-      removeMedical: (id) => update((d) => ({ ...d, medical: d.medical.filter((m) => m.id !== id) })),
-      setNoMedical: (childId, value) =>
-        update((d) => ({ ...d, children: d.children.map((c) => (c.id === childId ? { ...c, noMedicalConditions: value } : c)) })),
-      signConsent: (form) => update((d) => ({ ...d, consents: [...d.consents.filter((c) => c.childId !== form.childId), form] })),
+      saveMedical: (alert, id) => sendMedical({ action: 'saveAlert', ...alert, id }),
+      removeMedical: async (id) => {
+        const childId = data.medical.find((m) => m.id === id)?.childId;
+        if (childId) await sendMedical({ action: 'removeAlert', childId, id });
+      },
+      setNoMedical: (childId, value) => sendMedical({ action: 'setNoMedical', childId, value }),
+      signConsent: (form) => sendMedical({ action: 'signConsent', ...form }),
       logAccess: (what, childId) => update((d) => record(d, what, childId)),
       fixClothing: (childId, clothing) => sendToday({ action: 'fixClothing', childId, ...clothing }),
       checkIn: (childId, clothing) => sendToday({ action: 'checkIn', childId, ...clothing }),
@@ -460,7 +522,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { added: rows.length - updated, updated };
       },
     };
-  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, notifications, readNotifications, pushGuardians, sendToday, sendGroups, refreshSession, endSession]);
+  }, [data, me, now, stamp, update, guardianLink, sessionChecked, liveLink, medicalLink, sendMedical, notifications, readNotifications, pushGuardians, sendToday, sendGroups, refreshSession, endSession]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }

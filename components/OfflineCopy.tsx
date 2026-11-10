@@ -175,7 +175,7 @@ export function useOnline() {
 
 const t = (iso: string) => new Date(iso).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
 
-export function OfflineCopyCard({ copy, onSave, onRemove, onView, error }: { copy: OfflineSnapshot | null; onSave: () => void; onRemove: () => void; onView: () => void; error?: string | null }) {
+export function OfflineCopyCard({ copy, onSave, onRemove, onView, error, canSave }: { copy: OfflineSnapshot | null; onSave: () => void; onRemove: () => void; onView: () => void; error?: string | null; canSave: boolean }) {
   return (
     <section className="card" data-testid="offline-card">
       {error && <p className="field-error" role="alert" data-testid="offline-error">{error}</p>}
@@ -189,7 +189,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView, error }: { cop
             Names, clothing and short alerts only. Keep this page open: reopening without a connection is not supported. Save again after changes.
           </p>
           <div className="row">
-            <button type="button" className="primary" onClick={onSave} data-testid="offline-save">Update saved copy</button>
+            <button type="button" className="primary" disabled={!canSave} onClick={onSave} data-testid="offline-save">Update saved copy</button>
             <button type="button" onClick={onView} data-testid="offline-view">View offline copy</button>
             <button type="button" className="ghost" onClick={onRemove} data-testid="offline-delete">Delete</button>
           </div>
@@ -200,7 +200,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView, error }: { cop
           <p className="small muted" style={{ margin: '4px 0 10px' }}>
             Save today’s group to this browser: names, bibs, clothing and short alerts. Keep this page open before losing connectivity.
           </p>
-          <button type="button" className="primary big" onClick={onSave} data-testid="offline-save">Save for offline</button>
+          <button type="button" className="primary big" disabled={!canSave} onClick={onSave} data-testid="offline-save">Save for offline</button>
         </>
       )}
       <p className="small muted" style={{ marginTop: 12, marginBottom: 0 }}>Expires at 4 p.m. on the preview clock. Expiry is checked and deletion attempted while this screen is open. Closing the app does not erase the copy. Delete it before sharing this device.</p>

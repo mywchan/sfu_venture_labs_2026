@@ -18,7 +18,7 @@ export default function InstructorHome() {
 }
 
 function MyGroup() {
-  const { data, me } = useStore();
+  const { data, me, medicalLink } = useStore();
   const { group, kids } = groupForInstructor(data, me!);
   const [detail, setDetail] = useState<{ child: Child; alert: MedicalAlert } | null>(null);
   const [missing, setMissing] = useState<Child | null>(null);
@@ -54,7 +54,13 @@ function MyGroup() {
     <>
       <h1 data-testid="group-title">{group.name} · Level {group.level}</h1>
       <p className="muted">{kids.length} children today. Tap an alert for details.</p>
-      <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} error={error} />
+      {medicalLink !== 'connected' && (
+        <div className={medicalLink === 'offline' ? 'banner danger' : 'banner warn'} data-testid="medical-not-loaded">
+          {medicalLink === 'offline' ? 'Can’t load medical alerts right now. Check with the snow school office before your lesson.' : 'Loading medical alerts…'}
+        </div>
+      )}
+      <OfflineCopyCard copy={copy} onSave={save} onRemove={remove} onView={() => setViewingCopy(true)} error={error} canSave={medicalLink === 'connected'} />
+
       <div data-testid="group-list">
         {kids.map((c) => {
           const alerts = data.medical.filter((m) => m.childId === c.id);
