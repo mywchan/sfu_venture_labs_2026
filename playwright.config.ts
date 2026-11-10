@@ -11,6 +11,8 @@ const port = Number(process.env.PIEZAS_TEST_PORT || 3100);
 
 export default defineConfig({
   testDir: './tests',
+  // Node's backend suites run separately; keep browser discovery unchanged.
+  testIgnore: ['**/tests/backend/**'],
   outputDir: './.piezas/test-results/raw',
   fullyParallel: true,
   forbidOnly: true,

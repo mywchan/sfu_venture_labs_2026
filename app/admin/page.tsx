@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ReportMissing } from '@/components/ReportMissing';
 import { ROLE_LABEL, Shell } from '@/components/Shell';
-import { ageOn, fullName, groupOfChild, missingInfo, openSearchFor, timeLabel, todaysAttendance, userName } from '@/lib/access';
+import { ageOn, fullName, groupOfChild, missingInfo, openSearchFor, timeLabel, todayLabel, todaysAttendance, userName } from '@/lib/access';
 import { TODAY, TODAY_LESSON_DAY, type Child } from '@/lib/seed/data';
 import { useStore, type ImportRow } from '@/lib/store';
 
@@ -95,7 +95,7 @@ function GroupsTab() {
 
   return (
     <div data-testid="groups-tab">
-      <p className="muted">Saturday, December 12. Groups have up to {MAX_GROUP} children.</p>
+      <p className="muted">{todayLabel()}. Groups have up to {MAX_GROUP} children.</p>
       {error && <div className="banner danger" data-testid="group-error">{error}</div>}
       <div className="grid2">
         {groups.map((g) => {
@@ -218,7 +218,7 @@ function ChildrenTab() {
         </table>
       </div>
       {editing && <EditChild child={editing} onClose={() => setEditing(null)} />}
-      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} />}
+      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} limitToSystemTime />}
     </section>
   );
 }

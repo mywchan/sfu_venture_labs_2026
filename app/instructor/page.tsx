@@ -96,7 +96,7 @@ function MyGroup() {
         })}
       </div>
       {detail && <MedicalDetail child={detail.child} alert={detail.alert} onClose={() => setDetail(null)} />}
-      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} />}
+      {missing && <ReportMissing child={missing} onClose={() => setMissing(null)} limitToSystemTime />}
       {fixing && <FixClothing child={fixing} onClose={() => setFixing(null)} />}
     </>
   );
