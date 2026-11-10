@@ -407,3 +407,11 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
 
   throw new Refused('That request could not be read.', 400);
 }
+
+/** Open searches nobody on patrol has acknowledged yet. */
+export async function searchesWithNoAcknowledgement() {
+  const { emergency, ack } = await records();
+  const [rows, acks] = await Promise.all([listAll(emergency, { lessonDayId: TODAY_LESSON_DAY }), listAll(ack, {})]);
+  const acknowledged = new Set(acks.map((a) => String(a.data.emergencyId)));
+  return rows.filter((r) => toEmergency(r).status === 'open' && !acknowledged.has(r.id)).map((r) => ({ id: r.id, childId: String(r.data.childId), reportedAt: r.createdAt }));
+}
