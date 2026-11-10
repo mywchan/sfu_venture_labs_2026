@@ -14,6 +14,7 @@ import {
   parentOwnsChild,
   phoneProblem,
   timeLabel,
+  todayLabel,
   todaysAttendance,
   userName,
 } from '@/lib/access';
@@ -79,7 +80,7 @@ function LessonsTab({ childId }: { childId: string }) {
   const pickedUpBy = data.persons.find((p) => p.id === att?.pickedUpBy);
   return (
     <div className="card" data-testid="lessons-tab">
-      <h2>Today · Saturday, December 12</h2>
+      <h2>Today · {todayLabel()}</h2>
       <dl className="kv">
         <dt>Group</dt>
         <dd data-testid="lesson-group">{group ? `${group.name} · level ${group.level} · ${userName(data, group.instructorId)}` : 'Not placed yet'}</dd>
@@ -372,7 +373,7 @@ function ConsentTab({ childId }: { childId: string }) {
           setError('Tick the box and type your full name to sign.');
           return;
         }
-        signConsent({ childId, signedBy: signature.trim(), signedDate: '2026-12-12', photoConsent: photo });
+        signConsent({ childId, signedBy: signature.trim(), signedDate: TODAY, photoConsent: photo });
       }}
     >
       <h2>Consent form</h2>

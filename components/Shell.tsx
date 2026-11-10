@@ -43,8 +43,8 @@ export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean
         <span className="role-badge" data-testid="role-badge">{ROLE_LABEL[me.role]}</span>
         <span className="who" data-testid="signed-in-as">{me.name}</span>
         <span className="spacer" />
-        <span className="clock" title="Demo clock" data-testid="demo-clock">
-          Sat Dec 12 · {now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
+        <span className="clock" title="System date and time" data-testid="demo-clock">
+          {now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })} · {now.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}
         </span>
         <NotificationBell />
         <button
