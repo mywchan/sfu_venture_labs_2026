@@ -288,7 +288,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             {!deadline ? 'Verify escalation timing now' : msLeft > 0 ? `${countdown(msLeft)} remaining` : `Overdue by ${countdown(msLeft)}`}
           </div>
           {deadline && msLeft <= 0 && <p style={{ color: '#a3120a', fontWeight: 700 }}>Call police now and contact the family. These are human actions; the app does not make calls.</p>}
-          <p className="small" style={{ margin: 0 }}>60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
+          <p className="small" style={{ margin: 0 }}>60 minutes after last seen, or 6 p.m., whichever comes first. Call the family at the same time.</p>
         </section>
 
         <section className="card" aria-label="Police record">

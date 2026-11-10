@@ -76,15 +76,16 @@ test('rejects wrong types, excessive text and invalid bibs', () => {
 
 const deadlines = [
   ['winter hour limit', '2026-12-12T13:40:00-08:00', '2026-12-12T22:40:00.000Z'],
-  ['winter closing limit', '2026-12-12T15:40:00-08:00', '2026-12-13T00:00:00.000Z'],
-  ['summer closing limit', '2025-07-12T15:40:00-07:00', '2025-07-12T23:00:00.000Z'],
-  ['after closing', '2026-12-12T16:20:00-08:00', '2026-12-13T00:00:00.000Z'],
-  ['UTC date differs from Vancouver', '2026-12-13T00:20:00Z', '2026-12-13T00:00:00.000Z'],
+  // The presentation version's cutoff is 6 p.m. Vancouver time.
+  ['winter closing limit', '2026-12-12T17:40:00-08:00', '2026-12-13T02:00:00.000Z'],
+  ['summer closing limit', '2025-07-12T17:40:00-07:00', '2025-07-13T01:00:00.000Z'],
+  ['after closing', '2026-12-12T18:20:00-08:00', '2026-12-13T02:00:00.000Z'],
+  ['UTC date differs from Vancouver', '2026-12-13T02:20:00Z', '2026-12-13T02:00:00.000Z'],
   ['spring forward elapsed hour', '2025-03-09T01:30:00-08:00', '2025-03-09T10:30:00.000Z'],
   ['fall back first repeated hour', '2025-11-02T01:30:00-07:00', '2025-11-02T09:30:00.000Z'],
   ['fall back second repeated hour', '2025-11-02T01:30:00-08:00', '2025-11-02T10:30:00.000Z'],
-  ['spring transition closing', '2025-03-09T15:30:00-07:00', '2025-03-09T23:00:00.000Z'],
-  ['fall transition closing', '2025-11-02T15:30:00-08:00', '2025-11-03T00:00:00.000Z'],
+  ['spring transition closing', '2025-03-09T17:30:00-07:00', '2025-03-10T01:00:00.000Z'],
+  ['fall transition closing', '2025-11-02T17:30:00-08:00', '2025-11-03T02:00:00.000Z'],
 ] as const;
 for (const [name, seen, expected] of deadlines) {
   test(`deadline: ${name}`, () => {

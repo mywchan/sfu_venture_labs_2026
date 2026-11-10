@@ -33,11 +33,14 @@ function wallTime(ms: number): number {
     Number(parts.hour), Number(parts.minute), Number(parts.second));
 }
 
-function fourPm(seen: number): number {
+// Presentation version: the day's cutoff is 6 p.m. (not 4 p.m.) so the demo can run late.
+const CUTOFF_HOUR = 18;
+
+function dayCutoff(seen: number): number {
   const date = new Date(wallTime(seen));
-  const target = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 16);
+  const target = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), CUTOFF_HOUR);
   // Resolve the offset at the deadline, not at last seen: a clock change can
-  // occur between them. 16:00 is outside Vancouver's repeated/skipped hours.
+  // occur between them. 18:00 is outside Vancouver's repeated/skipped hours.
   let candidate = target;
   for (let i = 0; i < 4; i++) {
     const delta = target - wallTime(candidate);
@@ -51,7 +54,7 @@ function fourPm(seen: number): number {
 export function calculateIncidentDeadline(lastSeenAt: string, serverNow: string): IncidentDeadline {
   const seen = instant(lastSeenAt), now = instant(serverNow);
   if (seen === null || now === null) throw new RangeError('Explicit-offset timestamps are required.');
-  const deadline = Math.min(seen + 60 * 60_000, fourPm(seen));
+  const deadline = Math.min(seen + 60 * 60_000, dayCutoff(seen));
   return { deadlineAt: new Date(deadline).toISOString(), isOverdue: now >= deadline };
 }
 

@@ -125,9 +125,12 @@ export function lastSeenTimeChoices(current: Date) {
   return choices;
 }
 
-/** Police must be called 60 minutes after last seen, or at 4 p.m., whichever comes first. */
+/**
+ * Police must be called 60 minutes after last seen, or at the day's cutoff, whichever comes first.
+ * Presentation version: the cutoff is 6 p.m. (not 4 p.m.) so the demo can run in the late afternoon.
+ */
 export function policeDeadline(lastSeenAt: string) {
   const seen = new Date(lastSeenAt).getTime();
-  const four = new Date(lastSeenAt.slice(0, 10) + 'T16:00:00').getTime();
-  return new Date(Math.min(seen + 60 * 60_000, four));
+  const cutoff = new Date(lastSeenAt.slice(0, 10) + 'T18:00:00').getTime();
+  return new Date(Math.min(seen + 60 * 60_000, cutoff));
 }
