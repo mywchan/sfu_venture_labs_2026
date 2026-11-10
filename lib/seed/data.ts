@@ -125,23 +125,14 @@ export type Data = {
   accessRecords: AccessRecord[];
 };
 
-// The mountain's own time zone, so the date and times are the same wherever the
-// app is running: the live server's computer is on a different clock from ours.
-const SCHOOL_TIME_ZONE = 'America/Vancouver';
+// The mountain's clock, worked out the same way on every computer. B.C. now stays
+// on UTC-7 all year, but some computers still have the old winter rule built in,
+// so asking each one for "Vancouver time" made the server and browser disagree.
+const SCHOOL_UTC_OFFSET_HOURS = -7;
 
 function schoolParts(d: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: SCHOOL_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}:${get('second')}` };
+  const at = new Date(d.getTime() + SCHOOL_UTC_OFFSET_HOURS * 3_600_000).toISOString();
+  return { date: at.slice(0, 10), time: at.slice(11, 19) };
 }
 
 /** A date as YYYY-MM-DD at the mountain. */
