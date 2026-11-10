@@ -214,7 +214,11 @@ export async function readToday(user: User): Promise<TodayRows> {
   // An open search stays on screen until it's closed, even past midnight.
   const currentDay = currentLessonDayId();
   const emergencies = emergencyRows
-    .filter((r) => toEmergency(r).status === 'open' || r.data.lessonDayId === currentDay)
+    .filter((r) => {
+      const search = toEmergency(r);
+      // A required notice to the family stays on the list until it's marked done.
+      return search.status === 'open' || r.data.lessonDayId === currentDay || (search.sharedWithPoliceAt !== null && !search.noticeMailed);
+    })
     .map(toEmergency)
     .filter((e) => seesSearch(roster, user, e.childId))
     .reverse();
