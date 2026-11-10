@@ -81,7 +81,9 @@ function GroupsTab() {
   const unplaced = data.children.filter((c) => c.programDay === 'Saturday' && !groupOfChild(data, c.id));
   const [name, setName] = useState('');
   const [level, setLevel] = useState(2);
-  const [instructorId, setInstructorId] = useState(instructors[0]?.id ?? '');
+  // Starts on an instructor who is free today, so Create group works straight away.
+  const [pickedInstructor, setInstructorId] = useState('');
+  const instructorId = pickedInstructor || (instructors.find((u) => !groups.some((g) => g.instructorId === u.id)) ?? instructors[0])?.id || '';
   const [error, setError] = useState<string | null>(null);
 
   const tryMove = async (childId: string, groupId: string) => {
