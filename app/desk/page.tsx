@@ -137,6 +137,17 @@ function ChildPanel({ child }: { child: Child }) {
       <p className="muted small">Bib {child.bib} · Level {child.level} · {group ? `${group.name}, ${userName(data, group.instructorId)}` : 'No group yet'}</p>
 
       {search && <div className="banner danger">Ski patrol is searching for {child.firstName}.</div>}
+      {search && (
+        // Pickup stays closed during a search, but the desk can still call the family.
+        <div data-testid="search-contacts">
+          <h3>Parents to call</h3>
+          <ul className="small" data-testid="desk-contacts">
+            {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
+              <li key={link.id}>{person.name} ({link.relationship}): <a href={`tel:${person.phone}`}>{person.phone}</a></li>
+            ))}
+          </ul>
+        </div>
+      )}
       {error && <div className="banner danger" data-testid="desk-save-error">{error}</div>}
 
       {!a?.checkInAt && (
