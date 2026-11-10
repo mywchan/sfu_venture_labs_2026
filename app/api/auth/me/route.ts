@@ -13,7 +13,8 @@ export async function GET(request: Request) {
     return Response.json(
       {
         me: auth.user,
-        people: users.filter((u) => u.id !== auth.user.id).map((u) => ({ id: u.id, name: u.name, role: u.role, email: '' })),
+        // A parent only needs staff names; other families stay private.
+        people: users.filter((u) => u.id !== auth.user.id && (auth.user.role !== 'parent' || u.role !== 'parent')).map((u) => ({ id: u.id, name: u.name, role: u.role, email: '' })),
         parentAccounts: parentAccounts.filter((p) => p.userId === auth.user.id),
       },
       { headers: { 'Cache-Control': 'no-store' } },

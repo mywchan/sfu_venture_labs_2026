@@ -1,4 +1,4 @@
-import { createAccount, directory, resendWelcome } from '@/lib/server/accounts';
+import { createAccount, directory, removeAccount, resendWelcome } from '@/lib/server/accounts';
 import { requireUser } from '@/lib/server/auth/current-user';
 import { Refused } from '@/lib/server/refused';
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 }
 
-/** Administrator only: create an account, or email a set-password link again. */
+/** Administrator only: create or remove an account, or email a set-password link again. */
 export async function POST(request: Request) {
   const auth = await requireUser(request);
   if ('response' in auth) return auth.response;
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
   }
   try {
     if (body.action === 'resend') await resendWelcome(body.accountId);
+    else if (body.action === 'remove') await removeAccount(body.accountId, auth.user);
     else await createAccount(body);
     return Response.json(await forScreen());
   } catch (err) {

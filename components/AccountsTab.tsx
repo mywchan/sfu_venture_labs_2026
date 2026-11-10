@@ -114,7 +114,21 @@ export function AccountsTab() {
                     <td><strong>{a.name}</strong></td>
                     <td className="small">{a.email}</td>
                     <td>{ROLE_LABEL[a.role]}</td>
-                    <td><button type="button" className="ghost small" disabled={saving} onClick={() => void send({ action: 'resend', accountId: a.id }, `Set-password email sent to ${a.email}.`)}>Resend email</button></td>
+                    <td className="row" style={{ gap: 6 }}>
+                      <button type="button" className="ghost small" disabled={saving} onClick={() => void send({ action: 'resend', accountId: a.id }, `Set-password email sent to ${a.email}.`)}>Resend email</button>
+                      <button
+                        type="button"
+                        className="ghost small"
+                        style={{ color: 'var(--danger)' }}
+                        disabled={saving}
+                        onClick={() => {
+                          if (window.confirm(`Remove ${a.name}'s access? They won't be able to sign in. To change a role, remove the account and create it again.`)) void send({ action: 'remove', accountId: a.id }, `${a.name}'s access has been removed.`);
+                        }}
+                        data-testid={`remove-account-${a.id}`}
+                      >
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

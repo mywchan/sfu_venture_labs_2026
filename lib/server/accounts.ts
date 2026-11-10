@@ -4,6 +4,7 @@ import 'server-only';
 // the Piezas accounts service; this record holds the person's role and, for a
 // parent, their children. Only this server can write it, using the API key.
 
+import { randomBytes } from 'node:crypto';
 import { seedData, type ParentAccount, type Role, type User } from '@/lib/seed/data';
 import { APP_ROLES, type RoleAssignment } from './auth/authorization';
 import type { VerifiedIdentity } from './auth/session';
@@ -128,12 +129,11 @@ export async function createAccount(raw: Record<string, unknown>): Promise<Accou
   if (role === 'parent' && wanted.length === 0 && !seedPerson) throw new Refused('Choose at least one child for this parent.', 422);
 
   const { client, scope } = piezasServer();
-  const [row] = (await client.users.importUsers(scope.appId, [{ email, emailVerified: true, profile: { name } }])).results;
+  // A long random password nobody ever sees: the person sets their own from the email below.
+  const [row] = (await client.users.importUsers(scope.appId, [{ email, emailVerified: true, password: randomBytes(32).toString('base64url'), profile: { name } }])).results;
   if (!row || row.status === 'error') throw new Error('Account could not be created.');
   const person = (await client.users.listUsers(scope.appId, { email, limit: 20 })).users.find((u) => sameText(u.email, email));
   if (!person) throw new Error('New account was not found.');
-  // An address that already had a sign-in gets a set-password link the normal way.
-  if (row.status === 'skipped_existing') await client.users.forgotPassword(scope.appId, email);
 
   const created = await entity.create({
     title: name,
@@ -147,7 +147,20 @@ export async function createAccount(raw: Record<string, unknown>): Promise<Accou
     },
   });
   cachedDirectory = null;
+  await client.users.forgotPassword(scope.appId, email); // the welcome email with the set-password link
   return toAccount(created);
+}
+
+/** Ends someone's access: they can no longer sign in, and any open session stops working. */
+export async function removeAccount(accountId: unknown, me: User) {
+  cachedDirectory = null;
+  const account = (await directory()).accounts.find((a) => a.id === accountId);
+  if (!account) throw new Refused('Not found', 404);
+  if (account.appUserId === me.id) throw new Refused('You can’t remove your own account.');
+  await (await records()).delete(account.id); // access ends here, even if the next step fails
+  cachedDirectory = null;
+  const { client, scope } = piezasServer();
+  await client.users.deleteUser(scope.appId, account.authUserId);
 }
 
 /** Sends the set-password email again, for someone who lost or never got it. */

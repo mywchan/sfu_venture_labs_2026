@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 // The Piezas scenario harness. `npx piezas test` runs this suite against a
@@ -8,6 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
 // running (previews, clips); `piezas test` ignores it unless
 // PIEZAS_TEST_ALLOW_EXTERNAL_SERVER=1, since that app may use the live key.
 const port = Number(process.env.PIEZAS_TEST_PORT || 3100);
+const testAppId: string = JSON.parse(readFileSync('piezas.manifest.json', 'utf-8')).testApp?.appId ?? '';
 
 export default defineConfig({
   testDir: './tests',
@@ -30,7 +32,7 @@ export default defineConfig({
         port,
         reuseExistingServer: false,
         timeout: 120_000,
-        env: { PIEZAS_API_KEY: process.env.PIEZAS_TEST_API_KEY ?? '' },
+        env: { PIEZAS_API_KEY: process.env.PIEZAS_TEST_API_KEY ?? '', PIEZAS_APP_ID: testAppId },
       },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

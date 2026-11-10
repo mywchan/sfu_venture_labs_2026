@@ -1,6 +1,7 @@
 // Creates the very first administrator, who can then create everyone else in the
 // app. Refuses to run once an administrator exists.
 //   npm run accounts:first-admin -- "Your Name" you@example.com
+import { randomBytes } from 'node:crypto';
 import { Piezas } from '@piezas/sdk';
 
 const [name, rawEmail] = process.argv.slice(2);
@@ -29,7 +30,7 @@ if (admins.data.length > 0) {
   process.exit(1);
 }
 
-const [row] = (await piezas.users.importUsers(appId, [{ email, emailVerified: true, profile: { name } }])).results;
+const [row] = (await piezas.users.importUsers(appId, [{ email, emailVerified: true, password: randomBytes(32).toString('base64url'), profile: { name } }])).results;
 if (!row || row.status === 'error') {
   console.error('\nPiezas could not create that account.\n');
   process.exit(1);
@@ -39,7 +40,7 @@ if (!person) {
   console.error('\nThe new account was not found. Please try again.\n');
   process.exit(1);
 }
-if (row.status === 'skipped_existing') await piezas.users.forgotPassword(appId, email);
 
 await account.create({ title: name, data: { authUserId: person.id, appUserId: `acct-${person.id}`, name: name.trim(), email, role: 'admin' } });
+await piezas.users.forgotPassword(appId, email);
 console.log(`\nDone. Check ${email} for an email with a link to set your password.\n`);
