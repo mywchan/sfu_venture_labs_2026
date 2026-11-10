@@ -115,7 +115,7 @@
   },
   "publicRoutes": [],
   "deploy": {
-    "requiredEnv": [],
+    "requiredEnv": ["PIEZAS_API_URL"],
     "optionalEnv": [],
     "appId": "794788d9-10e0-4ccb-bdf8-2455236c13dc"
   },

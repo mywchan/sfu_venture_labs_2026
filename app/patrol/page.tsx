@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Shell } from '@/components/Shell';
-import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, systemTimeOnPreviewDay, timeLabel, userName } from '@/lib/access';
+import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, timeLabel, userName } from '@/lib/access';
 import { TODAY, type Emergency } from '@/lib/seed/data';
 import { useStore } from '@/lib/store';
 import styles from './patrol.module.css';
@@ -17,6 +17,7 @@ export default function PatrolHome() {
 
 function Patrol() {
   const { data, now, markNoticeMailed } = useStore();
+  const [closedError, setClosedError] = useState<string | null>(null);
   const open = data.emergencies.filter((e) => e.status === 'open')
     .sort((a, b) => policeDeadline(a.lastSeenAt).getTime() - policeDeadline(b.lastSeenAt).getTime());
   const closed = data.emergencies.filter((e) => e.status === 'closed');
@@ -27,12 +28,12 @@ function Patrol() {
     <>
       <h1>Patrol response</h1>
       <p className="small muted" data-testid="patrol-preview-note">
-        Preview only: actions are simulated in this tab. No real alerts are delivered and no calls are made to police.
+        Made-up children only. This screen does not call police for you.
       </p>
       {open.length === 0 ? (
         <div className="card" data-testid="no-searches">
           <h2>No open searches</h2>
-          <p className="muted">Reports made in this preview appear here. Children’s details are only shown during an open search.</p>
+          <p className="muted">Reports appear here as soon as they are filed. Children’s details are only shown during an open search.</p>
         </div>
       ) : (
         <div className={styles.dashboard} data-testid="patrol-dashboard">
@@ -100,6 +101,7 @@ function Patrol() {
         <section className={`card ${styles.closedSearches}`} data-testid="closed-searches">
           <h2>Closed searches today</h2>
           <p className="small muted">Children’s details are no longer available once a search is closed.</p>
+          {closedError && <div className="banner danger" data-testid="closed-error">{closedError}</div>}
           <table>
             <thead><tr><th>Child</th><th>Closed</th><th>Outcome</th><th>Notice to family</th></tr></thead>
             <tbody>
@@ -116,7 +118,7 @@ function Patrol() {
                       ) : e.noticeMailed ? (
                         'Mailed'
                       ) : (
-                        <button type="button" onClick={() => markNoticeMailed(e.id)}>To mail · mark done</button>
+                        <button type="button" onClick={() => markNoticeMailed(e.id).then(() => setClosedError(null), (err: Error) => setClosedError(err.message))}>To mail · mark done</button>
                       )}
                     </td>
                   </tr>
@@ -131,7 +133,7 @@ function Patrol() {
 }
 
 function SearchScreen({ em }: { em: Emergency }) {
-  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess } = useStore();
+  const { data, me, now, acknowledge, shareWithPolice, markNoticeMailed, closeSearch, logAccess, guardianLink } = useStore();
   const child = data.children.find((c) => c.id === em.childId)!;
   const group = groupOfChild(data, child.id);
   const adults = adultsFor(data, child.id);
@@ -141,6 +143,21 @@ function SearchScreen({ em }: { em: Emergency }) {
   const iAcked = acks.some((a) => a.patrollerId === me!.id);
   const [closing, setClosing] = useState(false);
   const [outcome, setOutcome] = useState('Found safe');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Runs a save; the search stays on screen and shows the reason if it fails. */
+  const save = async (work: () => Promise<void>) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That didn’t save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const logged = useRef(false);
   useEffect(() => {
@@ -151,7 +168,7 @@ function SearchScreen({ em }: { em: Emergency }) {
 
   const deadline = policeDeadline(em.lastSeenAt);
   // A report made against the real clock has to be counted against the real clock.
-  const clock = em.usesSystemClock ? systemTimeOnPreviewDay() : now;
+  const clock = now;
   const msLeft = deadline.getTime() - clock.getTime();
   const minsLeft = Math.ceil(msLeft / 60_000);
   const minsMissing = Math.max(0, Math.floor((clock.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
@@ -161,6 +178,7 @@ function SearchScreen({ em }: { em: Emergency }) {
       <div className="banner danger" style={{ fontSize: '1.1rem' }}>
         MISSING CHILD: {fullName(child)}, age {ageOn(child.birthDate, TODAY)} · missing {minsMissing} min
       </div>
+      {error && <div className="banner danger" data-testid="search-save-error">{error}</div>}
 
       <section className={`card ${styles.responseControls}`} aria-label="Patrol acknowledgement">
         <div data-testid="acks">
@@ -171,7 +189,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             </ul>
           )}
         </div>
-        {!iAcked && <button className="primary" type="button" onClick={() => acknowledge(em.id)} data-testid="acknowledge">I’m on it</button>}
+        {!iAcked && <button className="primary" type="button" disabled={saving} onClick={() => void save(() => acknowledge(em.id))} data-testid="acknowledge">I’m on it</button>}
       </section>
 
       <div className={styles.detailGrid}>
@@ -208,14 +226,14 @@ function SearchScreen({ em }: { em: Emergency }) {
           </div>
           <p className="small muted">60 minutes after last seen, or 4 p.m., whichever comes first. Call the family at the same time.</p>
           {!em.sharedWithPoliceAt ? (
-            <button type="button" onClick={() => shareWithPolice(em.id)} data-testid="share-police">Record: details shared with police</button>
+            <button type="button" disabled={saving} onClick={() => void save(() => shareWithPolice(em.id))} data-testid="share-police">Record: details shared with police</button>
           ) : (
             <div className="stack">
               <div className="banner warn" data-testid="police-shared">Shared with police at {timeLabel(em.sharedWithPoliceAt)}</div>
               {!em.noticeMailed ? (
                 <div className="row between card" style={{ margin: 0 }} data-testid="notice-todo">
                   <span>Mail a notice to the family (privacy law)</span>
-                  <button type="button" onClick={() => markNoticeMailed(em.id)}>Mark done</button>
+                  <button type="button" disabled={saving} onClick={() => void save(() => markNoticeMailed(em.id))}>Mark done</button>
                 </div>
               ) : (
                 <span className="chip ok">Notice mailed</span>
@@ -235,14 +253,19 @@ function SearchScreen({ em }: { em: Emergency }) {
         </section>
 
         <section className="card" data-testid="search-contacts">
+          {guardianLink === 'offline' && (
+            <div className="banner danger" data-testid="guardians-stale">Can’t reach Peak Pals, so these contacts may be out of date.</div>
+          )}
           <h2>Emergency contacts</h2>
           {adults.filter((x) => x.link.contactOrder).map(({ person, link }) => (
             <p key={link.id}>
               <strong>{link.contactOrder}. {person.name}</strong> ({link.relationship})<br />
               <a href={`tel:${person.phone}`}>{person.phone}</a>
+              <br />
+              <span className={`chip ${link.canPickUp ? 'ok' : ''}`}>{link.canPickUp ? 'Can pick up' : 'Not allowed to pick up'}</span>
             </p>
           ))}
-          <h3>Also allowed to pick up</h3>
+          <h3>Other adults allowed to pick up</h3>
           <p className="small">{adults.filter((x) => x.link.canPickUp && !x.link.contactOrder).map((x) => `${x.person.name} (${x.link.relationship})`).join(', ') || 'No one else'}</p>
         </section>
       </div>
@@ -257,7 +280,7 @@ function SearchScreen({ em }: { em: Emergency }) {
             className={styles.closureForm}
             onSubmit={(e) => {
               e.preventDefault();
-              closeSearch(em.id, outcome);
+              void save(() => closeSearch(em.id, outcome));
             }}
           >
             <label htmlFor="outcome" style={{ margin: 0 }}>Outcome</label>
@@ -267,7 +290,7 @@ function SearchScreen({ em }: { em: Emergency }) {
               <option>Handed over to police</option>
               <option>False alarm</option>
             </select>
-            <button className="primary" type="submit" data-testid="close-confirm">Close search</button>
+            <button className="primary" type="submit" disabled={saving} data-testid="close-confirm">Close search</button>
             <button className="ghost" type="button" onClick={() => setClosing(false)}>Cancel</button>
           </form>
         )}

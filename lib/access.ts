@@ -4,6 +4,9 @@
 
 import { TODAY, TODAY_LESSON_DAY, type Child, type Data, type Emergency, type User } from './seed/data';
 
+/** Today in words, for example "Sunday, November 8". */
+export const todayLabel = () => new Date(`${TODAY}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+
 export const fullName = (c: Pick<Child, 'firstName' | 'lastName'>) => `${c.firstName} ${c.lastName}`;
 
 export function ageOn(birthDate: string, on: string) {
@@ -120,12 +123,6 @@ export function lastSeenTimeChoices(current: Date) {
   const firstStep = Math.floor((nowMinutes - 1) / LAST_SEEN_STEP) * LAST_SEEN_STEP;
   for (let m = firstStep; m >= CHECK_IN_STARTS; m -= LAST_SEEN_STEP) choices.push(toChoice(m));
   return choices;
-}
-
-/** This device's real time of day, placed on the preview's pretend date. */
-export function systemTimeOnPreviewDay() {
-  const d = new Date();
-  return new Date(`${TODAY}T${hhmm(d)}:${String(d.getSeconds()).padStart(2, '0')}`);
 }
 
 /** Police must be called 60 minutes after last seen, or at 4 p.m., whichever comes first. */
