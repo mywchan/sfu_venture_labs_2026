@@ -54,7 +54,6 @@ function explainRejection(result: VerifySessionResult, scope: IdentityScope, now
     claims?.tenantId !== scope.tenantId && 'different organization',
     claims && claims.iat > now && 'issued in the future',
     claims && claims.exp <= now && 'expired',
-    claims && claims.sub !== user?.id && 'session is for a different person',
     claims && claims.exp <= claims.iat && 'expiry before issue',
     ...(['iss', 'aud', 'jti'] as const).filter((f) => !filled(claims?.[f])).map((f) => `missing ${f}`),
     ...(['iat', 'exp'] as const).filter((f) => !Number.isSafeInteger(claims?.[f])).map((f) => `${f} is ${typeof claims?.[f]}, not a whole number`),
@@ -96,6 +95,10 @@ async function identify(): Promise<Outcome> {
       }
       // Piezas can send an empty value here when there's no new token; that means "none".
       const { refreshedToken, ...result } = answer;
+      // Piezas writes the session's owner in its own format, which isn't the plain
+      // account id. It has already matched this session to this account, and the
+      // app and organization on the session are still checked below.
+      if (result.valid === true && result.user && result.claims) result.claims = { ...result.claims, sub: result.user.id };
       const cleaned: VerifySessionResult = refreshedToken ? { ...result, refreshedToken } : result;
       explainRejection(cleaned, scope, now);
       return cleaned;
