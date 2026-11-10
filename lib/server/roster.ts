@@ -5,7 +5,8 @@ import { Piezas } from '@piezas/sdk';
 import { groupForInstructor, groupOfChild, fullName, parentOwnsChild } from '@/lib/access';
 import { seedData, TODAY_LESSON_DAY, type Data, type Group, type GroupMember, type User } from '@/lib/seed/data';
 import { hasUnread, notify, quietly } from './notifications';
-import { Refused } from './today';
+import { directory } from './accounts';
+import { Refused } from './refused';
 
 const MAX_GROUP = 6;
 const NOT_PLACED = 'none';
@@ -64,7 +65,7 @@ function toGroup(r: Stored): Group {
 export async function currentRoster(): Promise<Data> {
   const { group, placement } = await records();
   const day = { lessonDayId: TODAY_LESSON_DAY };
-  const [savedGroups, placements] = await Promise.all([listAll(group, day), listAll(placement, day)]);
+  const [savedGroups, placements, people] = await Promise.all([listAll(group, day), listAll(placement, day), directory()]);
   const firstPerChild = new Map<string, string>();
   for (const p of placements) {
     const childId = String(p.data.childId);
@@ -74,7 +75,7 @@ export async function currentRoster(): Promise<Data> {
     ...seedData.groupMembers.filter((m) => !firstPerChild.has(m.childId)),
     ...[...firstPerChild].filter(([, groupId]) => groupId !== NOT_PLACED).map(([childId, groupId]) => ({ groupId, childId })),
   ];
-  return { ...seedData, groups: [...seedData.groups, ...savedGroups.map(toGroup)], groupMembers };
+  return { ...seedData, users: people.users, parentAccounts: people.parentAccounts, groups: [...seedData.groups, ...savedGroups.map(toGroup)], groupMembers };
 }
 
 export function instructorOf(roster: Data, childId: string) {
@@ -87,14 +88,12 @@ export async function readRoster(user: User) {
   const ownGroup = user.role === 'instructor' ? groupForInstructor(roster, user).group?.id : null;
   const groupMembers =
     user.role === 'parent'
-      ? roster.groupMembers.filter((m) => parentOwnsChild(seedData, user, m.childId))
+      ? roster.groupMembers.filter((m) => parentOwnsChild(roster, user, m.childId))
       : user.role === 'instructor'
         ? roster.groupMembers.filter((m) => m.groupId === ownGroup)
         : roster.groupMembers;
   return { groups: roster.groups, groupMembers };
 }
-
-const isInstructor = (id: unknown) => seedData.users.some((u) => u.id === id && u.role === 'instructor');
 
 /** Creates a group or moves a child, then tells the instructor. Administrator only. */
 export async function changeRoster(user: User, raw: Record<string, unknown>) {
@@ -108,8 +107,8 @@ export async function changeRoster(user: User, raw: Record<string, unknown>) {
     const instructorId = raw.instructorId;
     if (!name || name.length > 60) throw new Refused('Please give the group a name.', 422);
     if (typeof level !== 'number' || !Number.isInteger(level) || level < 1 || level > 6) throw new Refused('Please choose a level from 1 to 6.', 422);
-    if (typeof instructorId !== 'string' || !isInstructor(instructorId)) throw new Refused('Please choose an instructor.', 422);
-    const instructor = seedData.users.find((u) => u.id === instructorId)!;
+    if (typeof instructorId !== 'string' || !roster.users.some((u) => u.id === instructorId && u.role === 'instructor')) throw new Refused('Please choose an instructor.', 422);
+    const instructor = roster.users.find((u) => u.id === instructorId)!;
     if (groupForInstructor(roster, instructor).group) throw new Refused(`${instructor.name} already has a group today. An instructor teaches one group at a time.`);
     const created = await group.create({ title: name, data: { lessonDayId: TODAY_LESSON_DAY, name, level, instructorId } });
     await quietly(() =>

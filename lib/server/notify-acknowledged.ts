@@ -2,10 +2,11 @@
 
 import { fullName } from '@/lib/access';
 import { seedData, type Role, type User } from '@/lib/seed/data';
+import { directory } from './accounts';
 import { notify } from './notifications';
 import { currentRoster, instructorOf } from './roster';
 
-const usersWithRole = (role: Role) => seedData.users.filter((u) => u.role === role).map((u) => u.id);
+const usersWithRole = async (role: Role) => (await directory()).users.filter((u) => u.role === role).map((u) => u.id);
 
 export async function onAcknowledged({ emergencyId, childId, patroller }: { emergencyId: string; childId: string; patroller: User }) {
   const child = seedData.children.find((c) => c.id === childId);
@@ -18,7 +19,7 @@ export async function onAcknowledged({ emergencyId, childId, patroller }: { emer
     refId: emergencyId,
     key: `acknowledged|${emergencyId}|${patroller.id}`,
   };
-  await notify(usersWithRole('admin'), { ...notice, href: '/admin' });
-  await notify(usersWithRole('desk'), { ...notice, href: '/desk' });
+  await notify(await usersWithRole('admin'), { ...notice, href: '/admin' });
+  await notify(await usersWithRole('desk'), { ...notice, href: '/desk' });
   if (instructor) await notify([instructor], { ...notice, href: '/instructor' });
 }

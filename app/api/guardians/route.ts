@@ -1,22 +1,23 @@
 import { LAST_ADULT, readGuardians, saveGuardians, validateGuardians } from '@/lib/server/guardians';
-import { localOnly, notFound, previewCaller } from '@/lib/server/preview-caller';
+import { requireUser } from '@/lib/server/auth/current-user';
+import { currentRoster } from '@/lib/server/roster';
 import { openSearchChildIds } from '@/lib/server/today';
 import { parentOwnsChild } from '@/lib/access';
-import { seedData, type User } from '@/lib/seed/data';
+import { seedData, type Data, type User } from '@/lib/seed/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Read rules from the permissions table. Patrol only gets a child's adults
 // while a search for that child is open.
-function canRead(user: User, childId: string, searching: Set<string>) {
-  if (user.role === 'parent') return parentOwnsChild(seedData, user, childId);
+function canRead(people: Data, user: User, childId: string, searching: Set<string>) {
+  if (user.role === 'parent') return parentOwnsChild(people, user, childId);
   if (user.role === 'patrol') return searching.has(childId);
   return user.role === 'desk' || user.role === 'admin';
 }
 
-function canEdit(user: User, childId: string) {
-  if (user.role === 'parent') return parentOwnsChild(seedData, user, childId);
+function canEdit(people: Data, user: User, childId: string) {
+  if (user.role === 'parent') return parentOwnsChild(people, user, childId);
   return user.role === 'admin';
 }
 
@@ -27,30 +28,32 @@ function failed(err: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (localOnly()) return notFound();
-  const user = previewCaller(new URL(request.url).searchParams.get('as'));
-  if (!user) return Response.json({ error: 'Not signed in' }, { status: 401 });
+  const auth = await requireUser(request);
+  if ('response' in auth) return auth.response;
+  const user = auth.user;
   try {
     const searching = user.role === 'patrol' ? await openSearchChildIds() : new Set<string>();
-    return Response.json({ guardians: await readGuardians((childId) => canRead(user, childId, searching)) }, { headers: { 'Cache-Control': 'no-store' } });
+    const people = user.role === 'parent' ? await currentRoster() : seedData;
+    return Response.json({ guardians: await readGuardians((childId) => canRead(people, user, childId, searching)) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     return failed(err);
   }
 }
 
 export async function PUT(request: Request) {
-  if (localOnly()) return notFound();
-  let body: { as?: unknown; childId?: unknown; guardians?: unknown; removedLinkIds?: unknown };
+  const auth = await requireUser(request);
+  if ('response' in auth) return auth.response;
+  const user = auth.user;
+  let body: { childId?: unknown; guardians?: unknown; removedLinkIds?: unknown };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: 'That request could not be read.' }, { status: 400 });
   }
-  const user = previewCaller(body.as);
-  if (!user) return Response.json({ error: 'Not signed in' }, { status: 401 });
   const childId = typeof body.childId === 'string' ? body.childId : '';
   // Someone else's child looks the same as a child that doesn't exist.
-  if (!seedData.children.some((c) => c.id === childId) || !canEdit(user, childId)) return notFound();
+  const people = user.role === 'parent' ? await currentRoster() : seedData;
+  if (!seedData.children.some((c) => c.id === childId) || !canEdit(people, user, childId)) return Response.json({ error: 'Not found' }, { status: 404 });
 
   const removed = Array.isArray(body.removedLinkIds) ? body.removedLinkIds.filter((id): id is string => typeof id === 'string') : [];
   const checked = validateGuardians(childId, body.guardians);

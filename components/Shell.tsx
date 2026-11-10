@@ -50,8 +50,8 @@ export function Shell({ role, narrow, children }: { role: Role; narrow?: boolean
         <button
           type="button"
           data-testid="switch-person"
-          onClick={() => {
-            signOut();
+          onClick={async () => {
+            await signOut();
             router.push('/');
           }}
         >

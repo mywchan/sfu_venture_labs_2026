@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AccountsTab } from '@/components/AccountsTab';
 import { ReportMissing } from '@/components/ReportMissing';
 import { ROLE_LABEL, Shell } from '@/components/Shell';
 import { ageOn, fullName, groupOfChild, missingInfo, openSearchFor, timeLabel, todayLabel, todaysAttendance, userName } from '@/lib/access';
@@ -15,7 +16,7 @@ export default function AdminHome() {
   );
 }
 
-type Tab = 'missing' | 'groups' | 'children' | 'access' | 'upload';
+type Tab = 'missing' | 'groups' | 'children' | 'accounts' | 'access' | 'upload';
 
 function Admin() {
   const [tab, setTab] = useState<Tab>('missing');
@@ -23,6 +24,7 @@ function Admin() {
     ['missing', 'Missing information'],
     ['groups', 'Groups'],
     ['children', 'Children'],
+    ['accounts', 'Accounts'],
     ['access', 'Access record'],
     ['upload', 'Store spreadsheet'],
   ];
@@ -37,6 +39,7 @@ function Admin() {
       {tab === 'missing' && <MissingTab />}
       {tab === 'groups' && <GroupsTab />}
       {tab === 'children' && <ChildrenTab />}
+      {tab === 'accounts' && <AccountsTab />}
       {tab === 'access' && <AccessTab />}
       {tab === 'upload' && <UploadTab />}
     </>

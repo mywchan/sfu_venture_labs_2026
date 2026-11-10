@@ -24,6 +24,7 @@ import { readGuardians } from './guardians';
 import { quietly } from './notifications';
 import { onAcknowledged } from './notify-acknowledged';
 import { clearRemindersOnAcknowledged, onMissingReported, onSearchClosed } from './notify-patrol';
+import { Refused } from './refused';
 import { currentRoster } from './roster';
 
 export type TodayRows = {
@@ -33,15 +34,7 @@ export type TodayRows = {
   acks: PatrolAck[];
 };
 
-/** The request was understood but isn't allowed; `message` is shown to the person. */
-export class Refused extends Error {
-  constructor(
-    message: string,
-    readonly status: number = 409,
-  ) {
-    super(message);
-  }
-}
+export { Refused };
 
 const PAGE_SIZE = 100;
 const OUTCOMES = ['Found safe', 'Found, needed first aid', 'Handed over to police', 'False alarm'];
@@ -191,7 +184,7 @@ const teaches = (roster: Data, user: User, childId: string) => user.role === 'in
 
 function seesAttendance(roster: Data, user: User, childId: string) {
   if (user.role === 'desk' || user.role === 'admin') return true;
-  if (user.role === 'parent') return parentOwnsChild(seedData, user, childId);
+  if (user.role === 'parent') return parentOwnsChild(roster, user, childId);
   return teaches(roster, user, childId);
 }
 
@@ -205,7 +198,7 @@ export async function readToday(user: User): Promise<TodayRows> {
   const { attendance, refusal, emergency, ack } = await records();
   const day = { lessonDayId: TODAY_LESSON_DAY };
   const staffOnly = user.role === 'desk' || user.role === 'admin';
-  const roster = user.role === 'instructor' ? await currentRoster() : seedData;
+  const roster = user.role === 'instructor' || user.role === 'parent' ? await currentRoster() : seedData;
   const [attendanceRows, refusalRows, emergencyRows, ackRows] = await Promise.all([
     user.role === 'patrol' ? [] : listAll(attendance, day),
     staffOnly ? listAll(refusal, day) : [],
