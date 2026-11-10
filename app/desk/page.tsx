@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ColourPicker } from '@/components/ColourPicker';
 import { ReportMissing } from '@/components/ReportMissing';
 import { Shell } from '@/components/Shell';
@@ -115,6 +115,10 @@ function ChildPanel({ child }: { child: Child }) {
   const [onList, setOnList] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const search = openSearchFor(data, child.id);
+  // Release waits for staff to confirm they checked the adult's identity.
+  const [pickupPersonId, setPickupPersonId] = useState<string | null>(null);
+  const pickupTrigger = useRef<HTMLButtonElement | null>(null);
+  const pickupAdult = adults.find(({ person, link }) => person.id === pickupPersonId && link.canPickUp);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,12 +206,27 @@ function ChildPanel({ child }: { child: Child }) {
           )}
           <div className="stack">
             {adults.filter((x) => x.link.canPickUp).map(({ person, link }) => (
-              <button key={link.id} type="button" className="big white" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={() => void save(() => release(child.id, person.id))} data-testid={`release-to-${person.name}`}>
+              <button key={link.id} type="button" className="big white" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={(event) => { pickupTrigger.current = event.currentTarget; setPickupPersonId(person.id); }} data-testid={`release-to-${person.name}`}>
                 <span>Release to <strong>{person.name}</strong> <span className="small">({link.relationship})</span></span>
                 <span className="small">{person.phone}</span>
               </button>
             ))}
           </div>
+          {pickupAdult && (
+            <PickupConfirmation
+              key={pickupAdult.person.id}
+              childName={fullName(child)}
+              adultName={pickupAdult.person.name}
+              onCancel={() => { setPickupPersonId(null); pickupTrigger.current?.focus(); }}
+              onConfirm={() => {
+                // Recheck permissions and attendance at confirmation. The server checks again when saving.
+                if (!a?.checkInAt || a.pickupAt || search || !adults.some(({ person, link }) => person.id === pickupAdult.person.id && link.canPickUp)) return;
+                const adultId = pickupAdult.person.id;
+                setPickupPersonId(null);
+                void save(() => release(child.id, adultId));
+              }}
+            />
+          )}
           {!askOther ? (
             <button type="button" className="wide" style={{ marginTop: 10 }} onClick={() => setAskOther(true)} data-testid="someone-else">Someone else is here</button>
           ) : (
@@ -251,5 +270,30 @@ function ChildPanel({ child }: { child: Child }) {
       )}
       {missing && <ReportMissing child={child} onClose={() => setMissing(false)} limitToSystemTime />}
     </div>
+  );
+}
+
+/** The last step before a release: staff confirm they checked the adult's identity. */
+function PickupConfirmation({ childName, adultName, onCancel, onConfirm }: {
+  childName: string; adultName: string; onCancel: () => void; onConfirm: () => void;
+}) {
+  const [identityChecked, setIdentityChecked] = useState(false);
+  return (
+    <form className="card" style={{ marginTop: 12 }} aria-labelledby="pickup-confirm-title" aria-describedby="pickup-confirm-note"
+      data-testid="pickup-confirmation" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onCancel(); } }}
+      onSubmit={(event) => { event.preventDefault(); if (identityChecked) onConfirm(); }}>
+      <h3 id="pickup-confirm-title">Confirm pickup</h3>
+      <p style={{ margin: '0 0 4px' }}>Child: <strong>{childName}</strong></p>
+      <p>Authorized adult: <strong>{adultName}</strong></p>
+      <p className="small muted" id="pickup-confirm-note">Staff must check identity before recording pickup. The app does not independently verify identity.</p>
+      <label className="checkbox field">
+        <input type="checkbox" autoFocus checked={identityChecked} onChange={(event) => setIdentityChecked(event.target.checked)} data-testid="pickup-identity-checked" />
+        I checked this adult’s identity against the approved pickup information.
+      </label>
+      <div className="button-stack">
+        <button type="submit" className="primary" disabled={!identityChecked} data-testid="pickup-confirm-release">Confirm release</button>
+        <button type="button" onClick={onCancel} data-testid="pickup-cancel">Cancel</button>
+      </div>
+    </form>
   );
 }
