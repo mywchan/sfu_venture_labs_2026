@@ -270,38 +270,7 @@ export const parentAccounts: ParentAccount[] = [
   { userId: 'u-fatima', childId: 'c-zoe' },
 ];
 
-export const medical: MedicalAlert[] = [
-  {
-    id: 'm-owen',
-    childId: 'c-owen',
-    shortAlert: 'Mild asthma: blue inhaler in jacket pocket',
-    details: 'Mild asthma, worse in cold air. Two puffs of the blue inhaler (salbutamol) if wheezing. Gets cold easily.',
-    medicationLocation: 'Left jacket pocket',
-    severity: 'medium',
-  },
-  {
-    id: 'm-zoe',
-    childId: 'c-zoe',
-    shortAlert: 'Bee sting allergy: EpiPen in backpack',
-    details: 'Anaphylaxis to bee stings (rare in winter). EpiPen Jr in the front pocket of her backpack.',
-    medicationLocation: 'Backpack, front pocket',
-    severity: 'high',
-  },
-  {
-    id: 'm-maya',
-    childId: 'c-maya',
-    shortAlert: 'Celiac: no gluten at lunch',
-    details: 'Celiac disease. Packs her own lunch; must not share food. Not life-threatening but makes her very ill.',
-    medicationLocation: 'None',
-    severity: 'medium',
-  },
-];
-// Ava's tree nut allergy is deliberately NOT here: in the preview, her parent
-// adds it and it shows up on the instructor's list straight away.
-
-export const consents: ConsentForm[] = children
-  .filter((c) => !['c-zoe', 'c-emma'].includes(c.id))
-  .map((c) => ({ childId: c.id, signedBy: 'Parent', signedDate: '2026-11-20', photoConsent: c.id !== 'c-lily' }));
+// Medical alerts and consent forms stay on the server: see lib/server/medical-seed.ts.
 
 export const lessonDays: LessonDay[] = [
   { id: TODAY_LESSON_DAY, date: TODAY, programDay: new Date().getDay() === 0 ? 'Sunday' : 'Saturday' },
@@ -361,8 +330,8 @@ export const seedData: Data = {
   persons,
   childPersons,
   parentAccounts,
-  medical,
-  consents,
+  medical: [], // filled from the server, only with what this person may see
+  consents: [],
   lessonDays,
   groups,
   groupMembers,

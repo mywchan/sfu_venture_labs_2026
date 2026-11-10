@@ -9,6 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "accounts:first-admin": "node --env-file=.env scripts/first-admin.mjs",
+    "data:medical": "node --env-file=.env scripts/medical.mjs",
+    "data:reset-medical": "node --env-file=.env scripts/medical.mjs reset",
     "data:guardians": "node --env-file=.env scripts/show-guardians.mjs",
     "data:today": "node --env-file=.env scripts/today.mjs",
     "data:reset-today": "node --env-file=.env scripts/today.mjs reset"

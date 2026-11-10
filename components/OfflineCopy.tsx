@@ -114,7 +114,7 @@ export function useOnline() {
 
 const t = (iso: string) => new Date(iso).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
 
-export function OfflineCopyCard({ copy, onSave, onRemove, onView }: { copy: OfflineSnapshot | null; onSave: () => void; onRemove: () => void; onView: () => void }) {
+export function OfflineCopyCard({ copy, onSave, onRemove, onView, canSave }: { copy: OfflineSnapshot | null; onSave: () => void; onRemove: () => void; onView: () => void; canSave: boolean }) {
   return (
     <section className="card" data-testid="offline-card">
       {copy ? (
@@ -127,7 +127,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView }: { copy: Offl
             Names, clothing and alerts only. Deletes itself at {t(copy.expiresAt)}. Save again after changes so it stays up to date.
           </p>
           <div className="row">
-            <button type="button" className="primary" onClick={onSave} data-testid="offline-save">Update saved copy</button>
+            <button type="button" className="primary" disabled={!canSave} onClick={onSave} data-testid="offline-save">Update saved copy</button>
             <button type="button" onClick={onView} data-testid="offline-view">View offline copy</button>
             <button type="button" className="ghost" onClick={onRemove} data-testid="offline-delete">Delete</button>
           </div>
@@ -138,7 +138,7 @@ export function OfflineCopyCard({ copy, onSave, onRemove, onView }: { copy: Offl
           <p className="small muted" style={{ margin: '4px 0 10px' }}>
             Save today’s group to this phone: names, bibs, clothing and alerts. It deletes itself at 4 p.m.
           </p>
-          <button type="button" className="primary big" onClick={onSave} data-testid="offline-save">Save for offline</button>
+          <button type="button" className="primary big" disabled={!canSave} onClick={onSave} data-testid="offline-save">Save for offline</button>
         </>
       )}
     </section>
