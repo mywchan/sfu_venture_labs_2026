@@ -167,9 +167,11 @@ function SearchScreen({ em }: { em: Emergency }) {
   }, [logAccess, child.id]);
 
   const deadline = policeDeadline(em.lastSeenAt);
-  const msLeft = deadline.getTime() - now.getTime();
+  // A report made against the real clock has to be counted against the real clock.
+  const clock = now;
+  const msLeft = deadline.getTime() - clock.getTime();
   const minsLeft = Math.ceil(msLeft / 60_000);
-  const minsMissing = Math.max(0, Math.floor((now.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
+  const minsMissing = Math.max(0, Math.floor((clock.getTime() - new Date(em.lastSeenAt).getTime()) / 60_000));
 
   return (
     <div id="patrol-incident-detail" className={styles.detail} data-testid="search-screen">
