@@ -35,39 +35,39 @@ function Desk() {
 
   return (
     <>
-      <div className="row between" style={{ marginBottom: 12 }}>
-        <h1 style={{ margin: 0 }}>Check-in and pickup</h1>
-        <div className="row small" data-testid="desk-counts">
-          <span className="chip ok">{checkedIn} of {kids.length} checked in</span>
-          <span className="chip">{pickedUp} gone home</span>
-        </div>
+      <h1 style={{ marginBottom: 2 }}>Check-in and pickup</h1>
+      <p className="subtitle">Kestrel Kids · Front desk</p>
+      <div className="desk-counts row small" data-testid="desk-counts">
+        <span className="chip ok">{checkedIn} of {kids.length} checked in</span>
+        <span className="chip outline">{pickedUp} gone home</span>
       </div>
-      <div className="grid2" style={{ alignItems: 'start' }}>
-        <section className="card">
+      <div className="desk-layout">
+        <section className="desk-list">
           <label htmlFor="desk-search">Find a child by name or bib number</label>
           <input id="desk-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Owen, or 101" autoFocus data-testid="desk-search" />
-          <div style={{ marginTop: 12, maxHeight: 480, overflowY: 'auto' }} data-testid="desk-results">
+          <div style={{ marginTop: 12, maxHeight: 560, overflowY: 'auto' }} data-testid="desk-results">
             {results.map((c) => {
               const a = att(c.id);
               const status = openSearchFor(data, c.id) ? (
-                <span className="chip danger">Missing</span>
+                <span className="chip fill danger">Missing</span>
               ) : a?.pickupAt ? (
-                <span className="chip">Gone home</span>
+                <span className="chip fill white">Gone home</span>
               ) : a?.checkInAt ? (
-                <span className="chip ok">Here</span>
+                <span className="chip fill ok">Here</span>
               ) : (
-                <span className="chip warn">Not checked in</span>
+                <span className="chip outline">Not checked in</span>
               );
               return (
                 <button
                   key={c.id}
                   type="button"
+                  className={c.id === selectedId ? 'desk-row selected' : 'desk-row'}
                   onClick={() => setSelectedId(c.id)}
-                  style={{ width: '100%', justifyContent: 'space-between', marginBottom: 6, borderColor: c.id === selectedId ? 'var(--brand)' : undefined }}
                   data-testid={`desk-result-${c.id}`}
                 >
                   <span>
-                    <strong>{fullName(c)}</strong> <span className="muted small">· bib {c.bib}</span>
+                    <strong>{fullName(c)}</strong>
+                    <span className="small muted" style={{ display: 'block', fontWeight: 400 }}>Bib {c.bib}</span>
                   </span>
                   {status}
                 </button>
@@ -76,7 +76,7 @@ function Desk() {
             {results.length === 0 && <p className="muted">No child matches “{q}”.</p>}
           </div>
         </section>
-        <section>{selected ? <ChildPanel key={selected.id} child={selected} /> : <div className="card muted">Pick a child to check in or release.</div>}</section>
+        <section className="desk-panel">{selected ? <ChildPanel key={selected.id} child={selected} /> : <div className="desk-empty">Pick a child to check in or release.</div>}</section>
       </div>
       {data.refusals.length > 0 && (
         <section className="card" data-testid="refusals">
@@ -132,11 +132,11 @@ function ChildPanel({ child }: { child: Child }) {
   };
 
   return (
-    <div className="card" data-testid="desk-child-panel">
-      <h2>{fullName(child)}</h2>
-      <p className="muted small">Bib {child.bib} · Level {child.level} · {group ? `${group.name}, ${userName(data, group.instructorId)}` : 'No group yet'}</p>
+    <div data-testid="desk-child-panel">
+      <h2 style={{ marginBottom: 2 }}>{fullName(child)}</h2>
+      <p className="subtitle">Bib {child.bib} · Level {child.level} · {group ? `${group.name}, ${userName(data, group.instructorId)}` : 'No group yet'}</p>
 
-      {search && <div className="banner danger">Ski patrol is searching for {child.firstName}.</div>}
+      {search && <div className="banner fill danger">Ski patrol is searching for {child.firstName}.</div>}
       {error && <div className="banner danger" data-testid="desk-save-error">{error}</div>}
 
       {!a?.checkInAt && (
@@ -178,9 +178,9 @@ function ChildPanel({ child }: { child: Child }) {
             </div>
           )}
           <h3>Pickup: approved adults</h3>
-          <p className="small muted">Ask for photo ID if you don’t recognize the adult.</p>
+          <p className="small" style={{ color: 'var(--red)', fontWeight: 600 }}>Ask for photo ID if you don’t recognize the adult.</p>
           {refused && (
-            <div className="banner danger" data-testid="pickup-refused">
+            <div className="banner fill danger" data-testid="pickup-refused">
               {refused} is NOT on {child.firstName}’s pickup list. Do not release {child.firstName}. Call a parent below.
             </div>
           )}
@@ -191,14 +191,14 @@ function ChildPanel({ child }: { child: Child }) {
           )}
           <div className="stack">
             {adults.filter((x) => x.link.canPickUp).map(({ person, link }) => (
-              <button key={link.id} type="button" className="big" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={() => void save(() => release(child.id, person.id))} data-testid={`release-to-${person.name}`}>
-                <span>Release to <strong>{person.name}</strong> <span className="muted small">({link.relationship})</span></span>
-                <span className="small muted">{person.phone}</span>
+              <button key={link.id} type="button" className="big white" style={{ justifyContent: 'space-between' }} disabled={saving} onClick={() => void save(() => release(child.id, person.id))} data-testid={`release-to-${person.name}`}>
+                <span>Release to <strong>{person.name}</strong> <span className="small">({link.relationship})</span></span>
+                <span className="small">{person.phone}</span>
               </button>
             ))}
           </div>
           {!askOther ? (
-            <button type="button" className="ghost" style={{ marginTop: 10 }} onClick={() => setAskOther(true)} data-testid="someone-else">Someone else is here</button>
+            <button type="button" className="wide" style={{ marginTop: 10 }} onClick={() => setAskOther(true)} data-testid="someone-else">Someone else is here</button>
           ) : (
             <form
               style={{ marginTop: 12 }}
@@ -235,7 +235,7 @@ function ChildPanel({ child }: { child: Child }) {
               <li key={link.id}>{person.name} ({link.relationship}): {person.phone}</li>
             ))}
           </ul>
-          <button type="button" className="ghost" style={{ color: 'var(--danger)' }} onClick={() => setMissing(true)} data-testid="desk-report-missing">Report missing</button>
+          <button type="button" className="danger" onClick={() => setMissing(true)} data-testid="desk-report-missing">Report missing</button>
         </div>
       )}
       {missing && <ReportMissing child={child} onClose={() => setMissing(false)} limitToSystemTime />}

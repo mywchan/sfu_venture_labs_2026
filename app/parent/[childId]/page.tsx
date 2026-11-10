@@ -31,6 +31,9 @@ export default function ParentChildPage() {
 
 type Tab = 'today' | 'adults' | 'medical' | 'consent';
 
+/** The words the parent picks when adding an alert, shown on the alert's strip. */
+const SEVERITY_LABEL: Record<Severity, string> = { high: 'Life-threatening', medium: 'Needs attention', low: 'Good to know' };
+
 function ChildDetail() {
   const { childId } = useParams<{ childId: string }>();
   const { data, me } = useStore();
@@ -57,14 +60,14 @@ function ChildDetail() {
 
   return (
     <>
-      <Link href="/parent" className="small">← Your children</Link>
       <h1 style={{ marginTop: 8 }} data-testid="child-name">{fullName(child)}</h1>
-      <p className="muted">Age {ageOn(child.birthDate, TODAY)} · Level {child.level} · {child.programDay}s · Order {child.orderNumber}</p>
-      <div className="tabs" role="tablist">
+      <p className="subtitle">Age {ageOn(child.birthDate, TODAY)} · Level {child.level} · {child.programDay}s · Order {child.orderNumber}</p>
+      <div className="tabs segmented" role="tablist">
         {tabs.map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} data-testid={`tab-${id}`}>{label}</button>
         ))}
       </div>
+      <Link href="/parent" className="back-link">&lt; Your children</Link>
       {tab === 'today' && <LessonsTab childId={child.id} />}
       {tab === 'adults' && <AdultsTab childId={child.id} />}
       {tab === 'medical' && <MedicalTab childId={child.id} />}
@@ -79,20 +82,26 @@ function LessonsTab({ childId }: { childId: string }) {
   const att = todaysAttendance(data, childId);
   const pickedUpBy = data.persons.find((p) => p.id === att?.pickedUpBy);
   return (
-    <div className="card" data-testid="lessons-tab">
-      <h2>Today · {todayLabel()}</h2>
-      <dl className="kv">
-        <dt>Group</dt>
-        <dd data-testid="lesson-group">{group ? `${group.name} · level ${group.level} · ${userName(data, group.instructorId)}` : 'Not placed yet'}</dd>
-        <dt>Checked in</dt>
-        <dd data-testid="lesson-checkin">{att?.checkInAt ? timeLabel(att.checkInAt) : 'Not yet'}</dd>
-        <dt>Picked up</dt>
-        <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${att.pickedUpName ?? pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
-      </dl>
-      <h3 style={{ marginTop: 16 }}>Lesson days</h3>
-      <ul className="small">
+    <div data-testid="lessons-tab">
+      <div className="card info" style={{ padding: 'var(--space-lg)' }}>
+        <div className="small" style={{ fontWeight: 600 }}>Today · {todayLabel()}</div>
+        <dl className="kv" style={{ marginTop: 8 }}>
+          <dt>Group</dt>
+          <dd data-testid="lesson-group">{group ? `${group.name} · level ${group.level} · ${userName(data, group.instructorId)}` : 'Not placed yet'}</dd>
+          <dt>Checked in</dt>
+          <dd data-testid="lesson-checkin">{att?.checkInAt ? timeLabel(att.checkInAt) : 'Not yet'}</dd>
+          <dt>Picked up</dt>
+          <dd data-testid="lesson-pickup">{att?.pickupAt ? `${timeLabel(att.pickupAt)} by ${att.pickedUpName ?? pickedUpBy?.name ?? '—'}` : 'Not yet'}</dd>
+        </dl>
+        {att?.pickupAt && <span className="chip fill ok" style={{ marginTop: 10 }}>Picked up</span>}
+      </div>
+      <h3>Lesson dates this season</h3>
+      <ul className="date-list">
         {data.lessonDays.map((d) => (
-          <li key={d.id}>{new Date(d.date + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}</li>
+          <li key={d.id} className={d.date === TODAY ? 'today' : undefined}>
+            {new Date(d.date + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {d.date === TODAY && <span className="chip fill white">Today</span>}
+          </li>
         ))}
       </ul>
     </div>
@@ -128,27 +137,23 @@ function AdultsTab({ childId }: { childId: string }) {
       </div>
       {removeError && <div className="banner danger" data-testid="remove-error">{removeError}</div>}
       {adults.map(({ link, person }) => (
-        <div className="card" key={link.id} data-testid={`adult-${person.name}`}>
-          <div className="row between">
-            <div>
-              <div style={{ fontWeight: 700 }}>{person.name} <span className="muted small">({link.relationship})</span></div>
-              <div className="small">{person.phone}{person.email ? ` · ${person.email}` : ''}</div>
-            </div>
-            <div className="row">
-              {link.contactOrder && <span className="chip">Emergency contact {link.contactOrder}</span>}
-              {link.canPickUp ? <span className="chip ok">Can pick up</span> : <span className="chip">No pickup</span>}
-            </div>
+        <div className="card" key={link.id} style={{ padding: 'var(--space-lg)' }} data-testid={`adult-${person.name}`}>
+          <div className="row" style={{ gap: 'var(--space-sm)', marginBottom: 8 }}>
+            {link.contactOrder && <span className="chip fill white">Emergency contact {link.contactOrder}</span>}
+            {link.canPickUp ? <span className="chip outline">Can pick up</span> : <span className="chip">No pickup</span>}
           </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button type="button" onClick={() => setEditing({ link, person })}>Edit</button>
-            <button type="button" className="ghost" disabled={removing === link.id} onClick={() => remove(link.id)}>{removing === link.id ? 'Removing…' : 'Remove'}</button>
+          <div style={{ fontWeight: 700 }}>{person.name} ({link.relationship})</div>
+          <div>{person.phone}{person.email ? ` · ${person.email}` : ''}</div>
+          <div className="button-pair" style={{ marginTop: 12 }}>
+            <button type="button" className="yellow" onClick={() => setEditing({ link, person })}>Edit</button>
+            <button type="button" className="pink" disabled={removing === link.id} onClick={() => remove(link.id)}>{removing === link.id ? 'Removing…' : 'Remove'}</button>
           </div>
         </div>
       ))}
       {editing ? (
         <AdultForm childId={childId} initial={editing} onDone={() => setEditing(null)} />
       ) : (
-        <button type="button" className="primary" onClick={() => setEditing({})} data-testid="add-adult">+ Add an adult</button>
+        <button type="button" className="white wide" onClick={() => setEditing({})} data-testid="add-adult">Add an adult</button>
       )}
     </div>
   );
@@ -158,6 +163,7 @@ let personN = 0;
 
 function AdultForm({ childId, initial, onDone }: { childId: string; initial: { link?: ChildPerson; person?: Person }; onDone: () => void }) {
   const { data, savePerson } = useStore();
+  const child = data.children.find((c) => c.id === childId);
   // One more position than there are other emergency contacts: with 2 already, a 3rd is offered, and so on.
   const otherContacts = adultsFor(data, childId).filter((x) => x.link.contactOrder !== null && x.link.id !== initial.link?.id).length;
   const positions = Array.from({ length: otherContacts + 1 }, (_, i) => i + 1);
@@ -202,7 +208,8 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
       }}
     >
       <h2>{initial.person ? 'Edit adult' : 'Add an adult'}</h2>
-      <div className="grid2">
+      {child && <p className="subtitle">{fullName(child)}</p>}
+      <div>
         <div className="field">
           <label htmlFor="a-name">Full name</label>
           <input id="a-name" value={name} onChange={(e) => setName(e.target.value)} data-testid="adult-name" />
@@ -231,7 +238,7 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
             ))}
           </select>
         </div>
-        <div className="field" style={{ alignSelf: 'end' }}>
+        <div className="field">
           <label className="checkbox">
             <input type="checkbox" checked={canPickUp} onChange={(e) => setCanPickUp(e.target.checked)} data-testid="adult-can-pickup" />
             Allowed to pick up
@@ -239,9 +246,9 @@ function AdultForm({ childId, initial, onDone }: { childId: string; initial: { l
         </div>
       </div>
       {saveError && <div className="banner danger" data-testid="adult-save-error">{saveError}</div>}
-      <div className="row">
+      <div className="button-stack">
         <button className="primary" type="submit" disabled={saving} data-testid="adult-save">{saving ? 'Saving…' : 'Save'}</button>
-        <button type="button" className="ghost" onClick={onDone}>Cancel</button>
+        <button type="button" onClick={onDone}>Cancel</button>
       </div>
     </form>
   );
@@ -259,13 +266,18 @@ function MedicalTab({ childId }: { childId: string }) {
         Your child’s instructor sees the <strong>short alert</strong> at a glance. The details open only with a tap, and each look is recorded. The desk never sees medical information.
       </p>
       {alerts.map((m) => (
-        <div className="card" key={m.id}>
-          <div className={`alert-line ${m.severity}`}>{m.shortAlert}</div>
-          <p className="small" style={{ marginTop: 8 }}>{m.details}</p>
-          <p className="small muted">Medication kept: {m.medicationLocation}</p>
-          <div className="row">
-            <button type="button" onClick={() => setEditing(m)}>Edit</button>
-            <button type="button" className="ghost" onClick={() => removeMedical(m.id)}>Remove</button>
+        <div className={`card strip-card ${m.severity}`} key={m.id}>
+          <div className="strip">{SEVERITY_LABEL[m.severity]}</div>
+          <div className="strip-body">
+            <div className="row between" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+              <strong style={{ fontSize: 'var(--text-body)' }}>{m.shortAlert}</strong>
+              <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                <button type="button" className="yellow small" onClick={() => setEditing(m)}>Edit</button>
+                <button type="button" className="pink small" onClick={() => removeMedical(m.id)}>Remove</button>
+              </div>
+            </div>
+            {m.details && <p className="small" style={{ marginTop: 6, marginBottom: 4 }}>Details: {m.details}</p>}
+            <p className="small" style={{ margin: 0, fontWeight: 700 }}>Medication: {m.medicationLocation}</p>
           </div>
         </div>
       ))}
@@ -278,7 +290,7 @@ function MedicalTab({ childId }: { childId: string }) {
       {editing ? (
         <MedicalForm childId={childId} initial={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
       ) : (
-        <button type="button" className="primary" onClick={() => setEditing('new')} data-testid="add-medical">+ Add an allergy or condition</button>
+        <button type="button" className="white wide" onClick={() => setEditing('new')} data-testid="add-medical">Add an allergy or condition</button>
       )}
     </div>
   );
@@ -317,7 +329,7 @@ function MedicalForm({ childId, initial, onDone }: { childId: string; initial: M
         <label htmlFor="m-details">Details</label>
         <textarea id="m-details" rows={3} value={details} onChange={(e) => setDetails(e.target.value)} data-testid="medical-details" />
       </div>
-      <div className="grid2">
+      <div>
         <div className="field">
           <label htmlFor="m-med">Where medication is kept</label>
           <input id="m-med" value={med} onChange={(e) => setMed(e.target.value)} placeholder="Backpack, front pocket" />
@@ -331,9 +343,9 @@ function MedicalForm({ childId, initial, onDone }: { childId: string; initial: M
           </select>
         </div>
       </div>
-      <div className="row">
+      <div className="button-stack">
         <button className="primary" type="submit" data-testid="medical-save">Save</button>
-        <button type="button" className="ghost" onClick={onDone}>Cancel</button>
+        <button type="button" onClick={onDone}>Cancel</button>
       </div>
     </form>
   );
@@ -349,23 +361,25 @@ function ConsentTab({ childId }: { childId: string }) {
 
   if (existing) {
     return (
-      <div className="card" data-testid="consent-signed">
-        <div className="banner ok">Consent form signed</div>
-        <dl className="kv">
-          <dt>Signed by</dt>
-          <dd>{existing.signedBy}</dd>
-          <dt>Date</dt>
-          <dd>{existing.signedDate}</dd>
-          <dt>Photo</dt>
-          <dd>{existing.photoConsent ? 'Staff and patrol may see a photo' : 'No photo'}</dd>
-        </dl>
+      <div className="card strip-card ok" data-testid="consent-signed">
+        <div className="strip">Signed</div>
+        <div className="strip-body">
+          <strong style={{ display: 'block', marginBottom: 8 }}>Consent form signed</strong>
+          <dl className="kv">
+            <dt>Signed by</dt>
+            <dd>{existing.signedBy}</dd>
+            <dt>Date</dt>
+            <dd>{existing.signedDate}</dd>
+            <dt>Photo</dt>
+            <dd>{existing.photoConsent ? 'Staff and patrol may see a photo' : 'No photo'}</dd>
+          </dl>
+        </div>
       </div>
     );
   }
 
   return (
     <form
-      className="card"
       data-testid="consent-form"
       onSubmit={(e) => {
         e.preventDefault();
@@ -376,10 +390,12 @@ function ConsentTab({ childId }: { childId: string }) {
         signConsent({ childId, signedBy: signature.trim(), signedDate: TODAY, photoConsent: photo });
       }}
     >
-      <h2>Consent form</h2>
-      <p className="small">
-        I agree that Kestrel Kids may use the information on this account to keep my child safe during lessons: to tell their instructor about medical alerts, to check who picks them up, and to give ski patrol everything they need if my child goes missing. In an emergency, details may be shared with police and search and rescue.
-      </p>
+      <div className="card" style={{ padding: 'var(--space-lg)' }}>
+        <h3>Season consent form</h3>
+        <p className="small" style={{ margin: 0 }}>
+          I agree that Kestrel Kids may use the information on this account to keep my child safe during lessons: to tell their instructor about medical alerts, to check who picks them up, and to give ski patrol everything they need if my child goes missing. In an emergency, details may be shared with police and search and rescue.
+        </p>
+      </div>
       <label className="checkbox field">
         <input type="checkbox" checked={photo} onChange={(e) => setPhoto(e.target.checked)} data-testid="consent-photo" />
         Staff and patrol may see a photo of my child (optional)
@@ -393,7 +409,7 @@ function ConsentTab({ childId }: { childId: string }) {
         <input id="sig" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={me?.name} data-testid="consent-signature" />
       </div>
       {error && <p className="field-error">{error}</p>}
-      <button className="primary" type="submit" data-testid="consent-submit">Sign consent form</button>
+      <button className="primary wide" type="submit" data-testid="consent-submit">Sign consent form</button>
     </form>
   );
 }

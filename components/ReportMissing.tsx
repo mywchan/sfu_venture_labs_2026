@@ -24,14 +24,15 @@ export function ReportMissing({ child, onClose, limitToSystemTime = false }: { c
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="rm-title" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()} data-testid="report-missing-sheet">
+      <div className={done || already ? 'sheet sent' : 'sheet'} onClick={(e) => e.stopPropagation()} data-testid="report-missing-sheet">
+        {(done || already) && <div className="sent-strip" aria-hidden="true">Sent</div>}
         {!online && <p className="banner danger" role="alert" data-testid="report-missing-offline">You are offline. No report can be sent or queued. Use your radio or the established emergency procedure now.</p>}
         {done || already ? (
           <>
             <h2 id="rm-title">Missing-child report</h2>
-            <div className="banner warn" role="status" data-testid="report-missing-sent">Report saved and ski patrol alerted in the portal. Watch for their acknowledgement.</div>
+            <div className="banner ok" role="status" data-testid="report-missing-sent">Report saved and ski patrol alerted in the portal. Watch for their acknowledgement.</div>
             <p>Stay where {child.firstName} was last seen if you can, and keep your radio on.</p>
-            <button className="big primary" type="button" onClick={onClose}>OK</button>
+            <button className="big white" type="button" onClick={onClose}>OK</button>
           </>
         ) : (
           <form
@@ -64,6 +65,7 @@ export function ReportMissing({ child, onClose, limitToSystemTime = false }: { c
             }}
           >
             <h2 id="rm-title">Report {fullName(child)} missing</h2>
+            <p><span className="chip outline">{fullName(child)} · Bib {child.bib}</span></p>
             <p className="small muted">Patrol is alerted in the portal only, so use your radio as well in a real emergency.</p>
             <div className="field">
               <label htmlFor="rm-place">Where were they last seen?</label>
@@ -90,7 +92,7 @@ export function ReportMissing({ child, onClose, limitToSystemTime = false }: { c
               </div>
             )}
             <button className="big danger" type="submit" disabled={!online || sending || timeProblem} data-testid="report-missing-send">{sending ? 'Alerting…' : 'Alert ski patrol now'}</button>
-            <button className="ghost" type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
+            <button type="button" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>Cancel</button>
           </form>
         )}
       </div>
