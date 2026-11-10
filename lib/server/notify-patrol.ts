@@ -21,7 +21,7 @@ export async function onMissingReported({ emergencyId, childId, lastSeenPlace }:
   await notify(await everyPatroller(), {
     kind: ALERT,
     message: `Missing child: ${childName(childId)}, last seen at ${lastSeenPlace}. Open the search and acknowledge it.`,
-    href: '/patrol',
+    href: `/patrol?search=${emergencyId}`,
     actionLabel: 'Open search',
     urgent: true,
     refId: emergencyId,
@@ -52,7 +52,7 @@ export async function sendDueReminders() {
       await notify(await everyPatroller(), {
         kind: REMINDER,
         message: `No one has acknowledged the search for ${childName(search.childId)} yet. It was reported ${round * 5} minutes ago.`,
-        href: '/patrol',
+        href: `/patrol?search=${search.id}`,
         actionLabel: 'Open search',
         urgent: true,
         refId: search.id,

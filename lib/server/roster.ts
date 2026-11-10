@@ -3,7 +3,7 @@
 
 import { Piezas } from '@piezas/sdk';
 import { groupForInstructor, groupOfChild, fullName, parentOwnsChild } from '@/lib/access';
-import { seedData, TODAY_LESSON_DAY, type Data, type Group, type GroupMember, type User } from '@/lib/seed/data';
+import { currentLessonDayId, seedData, TODAY_LESSON_DAY, type Data, type Group, type GroupMember, type User } from '@/lib/seed/data';
 import { hasUnread, notify, quietly } from './notifications';
 import { directory } from './accounts';
 import { Refused } from './refused';
@@ -92,7 +92,9 @@ export async function readRoster(user: User) {
       : user.role === 'instructor'
         ? roster.groupMembers.filter((m) => m.groupId === ownGroup)
         : roster.groupMembers;
-  return { groups: roster.groups, groupMembers };
+  // Keeps groups showing if the server has been running since before midnight.
+  const currentDay = currentLessonDayId();
+  return { groups: roster.groups.map((g) => (g.lessonDayId === TODAY_LESSON_DAY ? { ...g, lessonDayId: currentDay } : g)), groupMembers };
 }
 
 /** Creates a group or moves a child, then tells the instructor. Administrator only. */

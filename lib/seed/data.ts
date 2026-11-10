@@ -125,13 +125,38 @@ export type Data = {
   accessRecords: AccessRecord[];
 };
 
-/** A date as YYYY-MM-DD in this computer's own time zone. */
-export function localDate(d = new Date()) {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+// The mountain's own time zone, so the date and times are the same wherever the
+// app is running: the live server's computer is on a different clock from ours.
+const SCHOOL_TIME_ZONE = 'America/Vancouver';
+
+function schoolParts(d: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SCHOOL_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}:${get('second')}` };
 }
 
-// Today comes from the system clock. Each new day starts with a clean slate.
+/** A date as YYYY-MM-DD at the mountain. */
+export const localDate = (d = new Date()) => schoolParts(d).date;
+
+/** The date and time at the mountain, as YYYY-MM-DDTHH:MM:SS. */
+export function schoolClock(d = new Date()) {
+  const { date, time } = schoolParts(d);
+  return `${date}T${time}`;
+}
+
+/** Today's lesson day, worked out fresh, for a server that stays running past midnight. */
+export const currentLessonDayId = () => `day-${localDate()}`;
+
+// Today comes from the real date at the mountain. Each new day starts with a clean slate.
 export const TODAY = localDate();
 export const TODAY_LESSON_DAY = `day-${TODAY}`;
 
