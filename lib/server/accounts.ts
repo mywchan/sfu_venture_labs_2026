@@ -85,12 +85,17 @@ export async function roleAssignments(identity: VerifiedIdentity): Promise<RoleA
 let cachedDirectory: { until: number; value: Promise<Directory> } | null = null;
 export type Directory = { accounts: Account[]; users: User[]; parentAccounts: ParentAccount[] };
 
+/** Presentation accounts only work when the app runs on this computer with `npm run dev`. */
+export const demoMode = () => process.env.NODE_ENV !== 'production';
+
 async function loadDirectory(): Promise<Directory> {
   const accounts = await listAll(await records());
-  const users = accounts.map((a) => ({ id: a.appUserId, name: a.name, email: a.email, role: a.role }));
+  const real = accounts.map((a) => ({ id: a.appUserId, name: a.name, email: a.email, role: a.role }));
+  const realIds = new Set(real.map((u) => u.id));
+  const users = demoMode() ? [...seedData.users.filter((u) => !realIds.has(u.id)), ...real] : real;
   const parents = new Set(accounts.filter((a) => a.role === 'parent').map((a) => a.appUserId));
   const parentAccounts = [
-    ...seedData.parentAccounts.filter((p) => parents.has(p.userId)),
+    ...seedData.parentAccounts.filter((p) => demoMode() || parents.has(p.userId)),
     ...accounts.filter((a) => a.role === 'parent').flatMap((a) => a.childIds.map((childId) => ({ userId: a.appUserId, childId }))),
   ];
   return { accounts, users, parentAccounts };

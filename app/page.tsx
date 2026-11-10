@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ROLE_HOME } from '@/components/Shell';
+import { ROLE_HOME, ROLE_LABEL } from '@/components/Shell';
+import type { Role, User } from '@/lib/seed/data';
+import { fullName } from '@/lib/access';
 import { useStore } from '@/lib/store';
 
 type Step = 'password' | 'code' | 'forgot' | 'forgot-sent';
@@ -135,6 +137,74 @@ export default function SignIn() {
           </div>
         )}
       </section>
+
+      {process.env.NODE_ENV !== 'production' && <PresentationAccounts />}
     </main>
+  );
+}
+
+const ROLES: Role[] = ['parent', 'instructor', 'desk', 'patrol', 'admin'];
+
+/** One tap into any account, with no password or code. Only exists under `npm run dev`. */
+function PresentationAccounts() {
+  const { data, refreshSession } = useStore();
+  const [role, setRole] = useState<Role>('parent');
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const term = search.trim().toLowerCase();
+  const shown = data.users.filter((u) => (term ? u.name.toLowerCase().includes(term) : u.role === role));
+
+  const hint = (u: User) => {
+    if (u.role === 'parent') {
+      const kids = data.parentAccounts.filter((p) => p.userId === u.id).map((p) => data.children.find((c) => c.id === p.childId)).filter(Boolean);
+      return kids.map((c) => fullName(c!)).join(', ');
+    }
+    if (u.role === 'instructor') return data.groups.find((g) => g.instructorId === u.id)?.name ?? 'No group yet';
+    return ROLE_LABEL[u.role];
+  };
+
+  const go = async (u: User) => {
+    setBusy(u.id);
+    setError(null);
+    const result = await post('/api/auth/demo', { userId: u.id });
+    if (result.ok) {
+      const { user, problem } = await refreshSession();
+      if (user) return;
+      setError(problem);
+    } else {
+      setError(result.error ?? 'That account couldn’t be opened.');
+    }
+    setBusy(null);
+  };
+
+  return (
+    <section className="card demo-accounts" data-testid="demo-accounts">
+      <h2>Presentation accounts</h2>
+      <p className="small muted">{data.users.length} made-up accounts. One tap, no password or code. Only available on this computer.</p>
+      <div className="field">
+        <label htmlFor="demo-search">Find a person</label>
+        <input id="demo-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type a name" data-testid="demo-search" />
+      </div>
+      {!term && (
+        <div className="tabs" role="tablist">
+          {ROLES.map((r) => (
+            <button key={r} type="button" role="tab" aria-selected={role === r} onClick={() => setRole(r)} data-testid={`demo-tab-${r}`}>
+              {ROLE_LABEL[r]} ({data.users.filter((u) => u.role === r).length})
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="field-error" role="alert" data-testid="demo-error">{error}</p>}
+      <div className="stack">
+        {shown.map((u) => (
+          <button key={u.id} type="button" disabled={busy !== null} onClick={() => void go(u)} data-testid={`demo-${u.id}`}>
+            <span>{u.name}</span>
+            <span className="small muted">{busy === u.id ? 'Opening…' : hint(u)}</span>
+          </button>
+        ))}
+        {shown.length === 0 && <p className="muted small">No one matches “{search}”.</p>}
+      </div>
+    </section>
   );
 }

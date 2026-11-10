@@ -175,6 +175,42 @@ export const users: User[] = [
   { id: 'u-rob', name: 'Rob Fournier', email: 'rob.fournier@example.test', role: 'patrol' },
   { id: 'u-kai', name: 'Kai Andersen', email: 'kai.andersen@example.test', role: 'patrol' },
   { id: 'u-hana', name: 'Hana Sato', email: 'hana.sato@example.test', role: 'admin' },
+  // Extra made-up staff for presentations (dev branch).
+  { id: 'u-noor-haddad', name: "Noor Haddad", email: 'noor.haddad@example.test', role: 'instructor' },
+  { id: 'u-liam-tremblay', name: "Liam Tremblay", email: 'liam.tremblay@example.test', role: 'instructor' },
+  { id: 'u-sofia-rossi', name: "Sofia Rossi", email: 'sofia.rossi@example.test', role: 'instructor' },
+  { id: 'u-ethan-nakamura', name: "Ethan Nakamura", email: 'ethan.nakamura@example.test', role: 'instructor' },
+  { id: 'u-aisha-rahman', name: "Aisha Rahman", email: 'aisha.rahman@example.test', role: 'instructor' },
+  { id: 'u-mason-lefebvre', name: "Mason Lefebvre", email: 'mason.lefebvre@example.test', role: 'instructor' },
+  { id: 'u-zara-mahmood', name: "Zara Mahmood", email: 'zara.mahmood@example.test', role: 'instructor' },
+  { id: 'u-oliver-kowalski', name: "Oliver Kowalski", email: 'oliver.kowalski@example.test', role: 'instructor' },
+  { id: 'u-nina-petrova', name: "Nina Petrova", email: 'nina.petrova@example.test', role: 'instructor' },
+  { id: 'u-theo-gagnon', name: "Theo Gagnon", email: 'theo.gagnon@example.test', role: 'instructor' },
+  { id: 'u-hannah-yoon', name: "Hannah Yoon", email: 'hannah.yoon@example.test', role: 'instructor' },
+  { id: 'u-caleb-fraser', name: "Caleb Fraser", email: 'caleb.fraser@example.test', role: 'instructor' },
+  { id: 'u-isabel-reyes', name: "Isabel Reyes", email: 'isabel.reyes@example.test', role: 'instructor' },
+  { id: 'u-owen-sinclair', name: "Owen Sinclair", email: 'owen.sinclair@example.test', role: 'instructor' },
+  { id: 'u-maria-santos', name: "Maria Santos", email: 'maria.santos@example.test', role: 'instructor' },
+  { id: 'u-dylan-campbell', name: "Dylan Campbell", email: 'dylan.campbell@example.test', role: 'instructor' },
+  { id: 'u-tara-bhatt', name: "Tara Bhatt", email: 'tara.bhatt@example.test', role: 'instructor' },
+  { id: 'u-lucas-ferreira', name: "Lucas Ferreira", email: 'lucas.ferreira@example.test', role: 'instructor' },
+  { id: 'u-emily-zhao', name: "Emily Zhao", email: 'emily.zhao@example.test', role: 'instructor' },
+  { id: 'u-finn-oconnor', name: "Finn O'Connor", email: 'finn.oconnor@example.test', role: 'instructor' },
+  { id: 'u-rachel-dumont', name: "Rachel Dumont", email: 'rachel.dumont@example.test', role: 'desk' },
+  { id: 'u-andre-silva', name: "Andre Silva", email: 'andre.silva@example.test', role: 'desk' },
+  { id: 'u-joy-ocampo', name: "Joy Ocampo", email: 'joy.ocampo@example.test', role: 'desk' },
+  { id: 'u-erik-lindqvist', name: "Erik Lindqvist", email: 'erik.lindqvist@example.test', role: 'patrol' },
+  { id: 'u-sienna-clarke', name: "Sienna Clarke", email: 'sienna.clarke@example.test', role: 'patrol' },
+  { id: 'u-marcus-bell', name: "Marcus Bell", email: 'marcus.bell@example.test', role: 'patrol' },
+  { id: 'u-yuki-mori', name: "Yuki Mori", email: 'yuki.mori@example.test', role: 'patrol' },
+  { id: 'u-grant-macleod', name: "Grant MacLeod", email: 'grant.macleod@example.test', role: 'patrol' },
+  { id: 'u-leah-cohen', name: "Leah Cohen", email: 'leah.cohen@example.test', role: 'patrol' },
+  { id: 'u-tomas-novak', name: "Tomas Novak", email: 'tomas.novak@example.test', role: 'patrol' },
+  { id: 'u-ingrid-holm', name: "Ingrid Holm", email: 'ingrid.holm@example.test', role: 'patrol' },
+  { id: 'u-ravi-menon', name: "Ravi Menon", email: 'ravi.menon@example.test', role: 'patrol' },
+  { id: 'u-clara-bouchard', name: "Clara Bouchard", email: 'clara.bouchard@example.test', role: 'patrol' },
+  { id: 'u-nate-whitfield', name: "Nate Whitfield", email: 'nate.whitfield@example.test', role: 'patrol' },
+  { id: 'u-paige-morrison', name: "Paige Morrison", email: 'paige.morrison@example.test', role: 'patrol' },
 ];
 
 type ChildSeed = [id: string, first: string, last: string, birth: string, level: number, bib: number, noMedical: boolean];
@@ -380,12 +416,22 @@ export const attendance: Attendance[] = checkedIn.map(([childId, time, jacket, p
   releasedBy: null,
 }));
 
+// Presentation accounts (dev branch): every adult on file gets a made-up parent account.
+const parentPersons: Record<string, string> = { 'p-melissa': 'u-melissa', 'p-jun': 'u-jun', 'p-claire': 'u-claire', 'p-fatima-a': 'u-fatima' };
+const demoParentId = (personId: string) => parentPersons[personId] ?? `u-${personId.slice(2)}`;
+const demoParents: User[] = persons
+  .filter((p) => !parentPersons[p.id])
+  .map((p) => ({ id: demoParentId(p.id), name: p.name, email: p.email, role: 'parent' }));
+const demoParentLinks: ParentAccount[] = childPersons
+  .filter((cp) => !parentPersons[cp.personId])
+  .map((cp) => ({ userId: demoParentId(cp.personId), childId: cp.childId }));
+
 export const seedData: Data = {
-  users,
+  users: [...users, ...demoParents],
   children,
   persons,
   childPersons,
-  parentAccounts,
+  parentAccounts: [...parentAccounts, ...demoParentLinks],
   medical,
   consents,
   lessonDays,

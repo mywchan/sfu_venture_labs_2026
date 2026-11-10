@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { CODE_STEP_COOKIE, forgetSession, fromThisSite, notFromThisSite, SESSION_COOKIE } from '@/lib/server/auth/current-user';
+import { CODE_STEP_COOKIE, DEMO_COOKIE, forgetSession, fromThisSite, notFromThisSite, SESSION_COOKIE } from '@/lib/server/auth/current-user';
 import { piezasServer } from '@/lib/server/piezas/settings';
 
 export const runtime = 'nodejs';
@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   const token = jar.get(SESSION_COOKIE)?.value;
   jar.delete(SESSION_COOKIE);
   jar.delete(CODE_STEP_COOKIE);
+  jar.delete(DEMO_COOKIE);
   if (token) {
     forgetSession(token);
     try {

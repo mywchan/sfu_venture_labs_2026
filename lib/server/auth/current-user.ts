@@ -7,7 +7,8 @@ import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { User } from '@/lib/seed/data';
 import { PiezasError, type VerifySessionResult } from '@piezas/sdk';
-import { accountsFor, directory, roleAssignments } from '../accounts';
+import { seedData } from '@/lib/seed/data';
+import { accountsFor, demoMode, directory, roleAssignments } from '../accounts';
 import type { IdentityScope } from '../piezas/client';
 import { piezasServer } from '../piezas/settings';
 import { APP_ROLES, authorizeRole } from './authorization';
@@ -15,6 +16,7 @@ import { verifySession } from './session';
 
 export const SESSION_COOKIE = 'kk_session';
 export const CODE_STEP_COOKIE = 'kk_code_step';
+export const DEMO_COOKIE = 'kk_demo_user';
 
 const SESSION_MAX_AGE = 12 * 60 * 60; // the token's own expiry still applies
 const REMEMBER_MS = 15_000; // screens check every few seconds; don't ask Piezas each time
@@ -65,7 +67,12 @@ function explainRejection(result: VerifySessionResult, scope: IdentityScope, now
 }
 
 async function identify(): Promise<Outcome> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const jar = await cookies();
+  if (demoMode()) {
+    const demoUser = seedData.users.find((u) => u.id === jar.get(DEMO_COOKIE)?.value);
+    if (demoUser) return { kind: 'ok', user: demoUser };
+  }
+  const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return { kind: 'none' };
 
   const key = fingerprint(token);
