@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { adultsFor, ageOn, fullName, groupOfChild, policeDeadline, timeLabel, userName } from '@/lib/access';
 import { TODAY, type Emergency } from '@/lib/seed/data';
@@ -55,7 +56,9 @@ function IncidentActivity({ em }: { em: Emergency }) {
 export default function PatrolHome() {
   return (
     <Shell role="patrol">
-      <Patrol />
+      <Suspense fallback={<p className="muted">Loading…</p>}>
+        <Patrol />
+      </Suspense>
     </Shell>
   );
 }
@@ -67,6 +70,11 @@ function Patrol() {
     .sort((a, b) => (incidentDeadline(a.lastSeenAt, now)?.getTime() ?? 0) - (incidentDeadline(b.lastSeenAt, now)?.getTime() ?? 0));
   const closed = data.emergencies.filter((e) => e.status === 'closed');
   const [openId, setOpenId] = useState<string | null>(null);
+  // A notification opens straight to the search it's about.
+  const fromNotification = useSearchParams().get('search');
+  useEffect(() => {
+    if (fromNotification) setOpenId(fromNotification);
+  }, [fromNotification]);
   const current = open.find((e) => e.id === openId) ?? (open.length === 1 ? open[0] : null);
 
   return (

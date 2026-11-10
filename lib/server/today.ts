@@ -9,9 +9,10 @@
 import { Piezas } from '@piezas/sdk';
 import { groupForInstructor, parentOwnsChild } from '@/lib/access';
 import {
+  currentLessonDayId,
   localDate,
+  schoolClock,
   seedData,
-  TODAY,
   TODAY_LESSON_DAY,
   type Attendance,
   type Data,
@@ -196,13 +197,13 @@ function seesSearch(roster: Data, user: User, childId: string) {
 /** Today's records, cut down to what this person's role is allowed to see. */
 export async function readToday(user: User): Promise<TodayRows> {
   const { attendance, refusal, emergency, ack } = await records();
-  const day = { lessonDayId: TODAY_LESSON_DAY };
+  const day = { lessonDayId: currentLessonDayId() };
   const staffOnly = user.role === 'desk' || user.role === 'admin';
   const roster = user.role === 'instructor' || user.role === 'parent' ? await currentRoster() : seedData;
   const [attendanceRows, refusalRows, emergencyRows, ackRows] = await Promise.all([
     user.role === 'patrol' ? [] : listAll(attendance, day),
     staffOnly ? listAll(refusal, day) : [],
-    user.role === 'parent' ? [] : listAll(emergency, day),
+    user.role === 'parent' ? [] : listAll(emergency, {}),
     user.role === 'parent' ? [] : listAll(ack, {}),
   ]);
 
@@ -210,7 +211,17 @@ export async function readToday(user: User): Promise<TodayRows> {
   for (const row of attendanceRows.map(toAttendance)) {
     if (!onePerChild.has(row.childId) && seesAttendance(roster, user, row.childId)) onePerChild.set(row.childId, row);
   }
-  const emergencies = emergencyRows.map(toEmergency).filter((e) => seesSearch(roster, user, e.childId)).reverse();
+  // An open search stays on screen until it's closed, even past midnight.
+  const currentDay = currentLessonDayId();
+  const emergencies = emergencyRows
+    .filter((r) => {
+      const search = toEmergency(r);
+      // A required notice to the family stays on the list until it's marked done.
+      return search.status === 'open' || r.data.lessonDayId === currentDay || (search.sharedWithPoliceAt !== null && !search.noticeMailed);
+    })
+    .map(toEmergency)
+    .filter((e) => seesSearch(roster, user, e.childId))
+    .reverse();
   const emergencyIds = new Set(emergencies.map((e) => e.id));
   const seenAcks = new Set<string>();
   const acks = ackRows.map(toAck).filter((a) => {
@@ -225,13 +236,13 @@ export async function readToday(user: User): Promise<TodayRows> {
 /** Children patrol may currently see details for. */
 export async function openSearchChildIds(): Promise<Set<string>> {
   const { emergency } = await records();
-  const rows = await listAll(emergency, { lessonDayId: TODAY_LESSON_DAY });
+  const rows = await listAll(emergency, {});
   return new Set(rows.map(toEmergency).filter((e) => e.status === 'open').map((e) => e.childId));
 }
 
 /** The saved record for this child today, or else the preview's made-up one. */
 async function currentAttendance(entity: Entity, childId: string) {
-  const [record] = await listAll(entity, { childId, lessonDayId: TODAY_LESSON_DAY });
+  const [record] = await listAll(entity, { childId, lessonDayId: currentLessonDayId() });
   if (record) return { record, row: toAttendance(record) };
   const seed = seedData.attendance.find((a) => a.childId === childId && a.lessonDayId === TODAY_LESSON_DAY) ?? null;
   return { record: null, row: seed };
@@ -239,9 +250,9 @@ async function currentAttendance(entity: Entity, childId: string) {
 
 async function saveAttendance(entity: Entity, childId: string, record: Stored | null, row: Omit<Attendance, 'id'>) {
   const { id: _id, ...fields } = row as Attendance;
-  const data = withoutBlanks(fields);
+  const data = withoutBlanks({ ...fields, lessonDayId: currentLessonDayId() });
   if (record) await entity.update(record.id, { data });
-  else await entity.create({ title: `${childId} on ${TODAY}`, data });
+  else await entity.create({ title: `${childId} on ${localDate()}`, data });
 }
 
 /** May this adult take this child home? Uses the saved list when the child has one. */
@@ -260,9 +271,7 @@ function field(raw: Record<string, unknown>, name: string, max: number, label: s
 
 /** Times are set here, from the system clock, so a phone with the wrong time can't change the record. */
 function systemTime() {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${localDate(d)}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return schoolClock();
 }
 
 function requireRole(user: User, allowed: boolean) {
@@ -278,7 +287,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
   if (action === 'acknowledge' || action === 'shareWithPolice' || action === 'markNoticeMailed' || action === 'closeSearch') {
     requireRole(user, user.role === 'patrol');
     const emergencyId = field(raw, 'emergencyId', 64, 'the search');
-    const all = await listAll(emergency, { lessonDayId: TODAY_LESSON_DAY });
+    const all = await listAll(emergency, {});
     const record = all.find((r) => r.id === emergencyId);
     if (!record) throw new Refused('Not found', 404);
     const em = toEmergency(record);
@@ -314,7 +323,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
 
   const childId = typeof raw.childId === 'string' ? raw.childId : '';
   if (!seedData.children.some((c) => c.id === childId)) throw new Refused('Not found', 404);
-  const openFor = async () => (await listAll(emergency, { childId, lessonDayId: TODAY_LESSON_DAY })).filter((r) => toEmergency(r).status === 'open');
+  const openFor = async () => (await listAll(emergency, { childId })).filter((r) => toEmergency(r).status === 'open');
   const at = systemTime();
 
   if (action === 'checkIn' || action === 'fixClothing') {
@@ -330,7 +339,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
       if (!row?.checkInAt) {
         await saveAttendance(attendance, childId, record, {
           childId,
-          lessonDayId: TODAY_LESSON_DAY,
+          lessonDayId: currentLessonDayId(),
           checkInAt: at,
           checkedInBy: user.id,
           ...clothing,
@@ -365,7 +374,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
   if (action === 'refusePickup') {
     requireRole(user, user.role === 'desk');
     const nameGiven = field(raw, 'nameGiven', 120, 'the name');
-    await refusal.create({ title: `${nameGiven} refused for ${childId}`, data: { childId, lessonDayId: TODAY_LESSON_DAY, nameGiven, at, staffId: user.id } });
+    await refusal.create({ title: `${nameGiven} refused for ${childId}`, data: { childId, lessonDayId: currentLessonDayId(), nameGiven, at, staffId: user.id } });
     return readToday(user);
   }
 
@@ -381,11 +390,11 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
         title: `Missing: ${childId}`,
         data: withoutBlanks({
           childId,
-          lessonDayId: TODAY_LESSON_DAY,
+          lessonDayId: currentLessonDayId(),
           reportedBy: user.id,
           reportedAt: at,
           lastSeenPlace,
-          lastSeenAt: `${TODAY}T${lastSeenTime}:00`,
+          lastSeenAt: `${localDate()}T${lastSeenTime}:00`,
           jacket: row?.jacket || 'Not recorded',
           pants: row?.pants || 'Not recorded',
           helmet: row?.helmet || 'Not recorded',
@@ -404,7 +413,7 @@ export async function perform(user: User, raw: Record<string, unknown>): Promise
 /** Open searches nobody on patrol has acknowledged yet. */
 export async function searchesWithNoAcknowledgement() {
   const { emergency, ack } = await records();
-  const [rows, acks] = await Promise.all([listAll(emergency, { lessonDayId: TODAY_LESSON_DAY }), listAll(ack, {})]);
+  const [rows, acks] = await Promise.all([listAll(emergency, {}), listAll(ack, {})]);
   const acknowledged = new Set(acks.map((a) => String(a.data.emergencyId)));
   return rows.filter((r) => toEmergency(r).status === 'open' && !acknowledged.has(r.id)).map((r) => ({ id: r.id, childId: String(r.data.childId), reportedAt: r.createdAt }));
 }
