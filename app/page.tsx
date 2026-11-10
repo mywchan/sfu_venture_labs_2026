@@ -94,8 +94,8 @@ export default function SignIn() {
                 else setError(result.error ?? 'That didn’t work. Please try again.');
                 return;
               }
-              const person = await refreshSession();
-              if (!person) startOver('Your sign-in isn’t linked to a Kestrel Kids account. Please contact the snow school office.');
+              const { user, problem } = await refreshSession();
+              if (!user) startOver(problem);
             })}
           >
             <h2>Check your email</h2>

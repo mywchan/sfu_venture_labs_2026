@@ -32,7 +32,7 @@ type Store = {
   data: Data;
   me: User | null;
   now: Date;
-  refreshSession: () => Promise<User | null>; // asks the server who is signed in
+  refreshSession: () => Promise<{ user: User | null; problem: string | null }>; // asks the server who is signed in
   signOut: () => Promise<void>;
   // parent
   guardianLink: 'checking' | 'connected' | 'offline'; // is the app reaching Peak Pals for adults?
@@ -162,12 +162,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Asks the server who is signed in; the session itself stays in a cookie the page can't read. */
-  const refreshSession = useCallback(async (): Promise<User | null> => {
+  const refreshSession = useCallback(async (): Promise<{ user: User | null; problem: string | null }> => {
     try {
       const res = await fetch('/api/auth/me', { cache: 'no-store' });
       if (!res.ok) {
         setMeId(null);
-        return null;
+        const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+        return { user: null, problem: res.status === 401 ? 'We couldn’t finish signing you in. Please try again.' : (error ?? 'Couldn’t reach Peak Pals. Please try again.') };
       }
       const body = (await res.json()) as { me: User; people: User[]; parentAccounts: Data['parentAccounts'] };
       const known = new Set([body.me.id, ...body.people.map((u) => u.id)]);
@@ -177,10 +178,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         parentAccounts: [...d.parentAccounts.filter((p) => p.userId !== body.me.id), ...body.parentAccounts],
       }));
       setMeId(body.me.id);
-      return body.me;
+      return { user: body.me, problem: null };
     } catch {
       setMeId(null);
-      return null;
+      return { user: null, problem: 'Couldn’t reach Peak Pals. Please try again.' };
     } finally {
       setSessionChecked(true);
     }

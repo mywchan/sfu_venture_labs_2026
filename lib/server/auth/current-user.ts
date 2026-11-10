@@ -6,7 +6,9 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { User } from '@/lib/seed/data';
-import { accountsFor, roleAssignments } from '../accounts';
+import type { VerifySessionResult } from '@piezas/sdk';
+import { accountsFor, directory, roleAssignments } from '../accounts';
+import type { IdentityScope } from '../piezas/client';
 import { piezasServer } from '../piezas/settings';
 import { APP_ROLES, authorizeRole } from './authorization';
 import { verifySession } from './session';
@@ -16,6 +18,8 @@ export const CODE_STEP_COOKIE = 'kk_code_step';
 
 const SESSION_MAX_AGE = 12 * 60 * 60; // the token's own expiry still applies
 const REMEMBER_MS = 15_000; // screens check every few seconds; don't ask Piezas each time
+const CLOCK_ALLOWANCE_SECONDS = 60;
+const LOOKUP_TIMEOUT_MS = 15_000; // the first request after starting up is slow
 
 export const cookieOptions = (maxAge: number) => ({
   httpOnly: true,
@@ -38,6 +42,20 @@ export function forgetSession(token: string) {
   remembered.delete(fingerprint(token));
 }
 
+/** Logs which check would fail, by name only, so a rejected sign-in can be diagnosed. */
+function explainRejection(result: VerifySessionResult, scope: IdentityScope, now: number) {
+  const { user, claims } = result;
+  const problems = [
+    result.valid !== true && 'not valid',
+    user?.status !== 'active' && 'account not active',
+    claims?.appId !== scope.appId && 'different app',
+    claims?.tenantId !== scope.tenantId && 'different organization',
+    claims && claims.iat > now && 'issued in the future',
+    claims && claims.exp <= now && 'expired',
+  ].filter(Boolean);
+  if (problems.length > 0) console.warn(`[sign-in] session check: ${problems.join(', ')}`);
+}
+
 async function identify(): Promise<Outcome> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return { kind: 'none' };
@@ -53,11 +71,31 @@ async function identify(): Promise<Outcome> {
     console.error('[sign-in] server settings are missing or invalid', err instanceof Error ? err.message : '');
     return { kind: 'unavailable' };
   }
-  const session = await verifySession(token, scope, (appId, credential) => client.users.getSession(appId, credential));
-  if (!session.ok) return { kind: session.reason === 'unavailable' ? 'unavailable' : 'none' };
+  // A just-issued session can look like it's from the future if this computer's
+  // clock is slightly behind Piezas's, so allow for a small difference.
+  const now = Math.floor(Date.now() / 1000) + CLOCK_ALLOWANCE_SECONDS;
+  const session = await verifySession(
+    token,
+    scope,
+    async (appId, credential) => {
+      const result = await client.users.getSession(appId, credential);
+      explainRejection(result, scope, now);
+      return result;
+    },
+    now,
+    LOOKUP_TIMEOUT_MS,
+  );
+  if (!session.ok) {
+    console.warn(`[sign-in] session not accepted: ${session.reason}`);
+    return { kind: session.reason === 'unavailable' ? 'unavailable' : 'none' };
+  }
 
-  const authorized = await authorizeRole(session.identity, APP_ROLES, roleAssignments);
-  if (!authorized.ok) return { kind: authorized.reason === 'unavailable' ? 'unavailable' : 'no-role' };
+  await directory().catch(() => null); // first use sets up the records, outside the time limit below
+  const authorized = await authorizeRole(session.identity, APP_ROLES, roleAssignments, LOOKUP_TIMEOUT_MS);
+  if (!authorized.ok) {
+    console.warn(`[sign-in] role not accepted: ${authorized.reason}`);
+    return { kind: authorized.reason === 'unavailable' ? 'unavailable' : 'no-role' };
+  }
 
   let account;
   try {
