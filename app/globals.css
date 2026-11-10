@@ -464,4 +464,28 @@ tbody tr:last-child td { border-bottom: none; }
 .kv dt { color: var(--ink-2); font-size: var(--text-caption); }
 .kv dd { margin: 0; font-weight: 600; }
 
+/* Sign-in screens: brand at the top left, no card, blue text links. */
+.auth-page { padding-top: var(--space-xl); }
+.auth-brand { margin-bottom: var(--space-xl); }
+.auth-brand h1 { font-size: var(--text-title); margin-bottom: 2px; }
+.auth-page h2 { margin-bottom: var(--space-md); }
+.auth-page form > .primary, .auth-page .btn.primary { margin-top: var(--space-xs); }
+.text-link, button.text-link {
+  display: block;
+  min-height: 0;
+  margin-top: var(--space-md);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--info);
+  font-weight: 600;
+  text-decoration: none;
+}
+button.text-link:hover { background: transparent; text-decoration: underline; }
+.auth-notice { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md); border: 1.5px solid var(--rule); border-radius: var(--radius-md); margin-bottom: var(--space-lg); font-weight: 600; }
+.auth-notice .chip { flex: none; }
+.auth-notice.danger { border-color: var(--red); }
+.auth-notice.ok { border-color: var(--green); }
+.code-input { font-size: var(--text-title); letter-spacing: 0.5em; text-align: center; font-variant-numeric: tabular-nums; }
+
 .demo-accounts button { justify-content: space-between; width: 100%; }
